@@ -67,6 +67,8 @@ def refresh_intro():
     bback.configure(state=DISABLED if intro_part == 0 else NORMAL)
     bnext.configure(text="Chat!" if intro_part else "Next >")
     if intro_part:
+        if intro_part == 2:
+            intro.destroy()
         if "logins" in cfg["servers"][server]:
             for i in list(cfg["servers"][server]["logins"].keys()):
                 users.insert(END,i)
@@ -239,10 +241,7 @@ introcanvas.place(x=3,y=5)
 refresh_intro()
 
 try:
-    while intro_part < 2:
-        intro.update()
-    intro.quit()
-    intro.destroy()
+    intro.mainloop()
 except TclError:
     pass
 

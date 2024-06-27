@@ -90,13 +90,21 @@ def next():
     global welcome_count,server,user,intro_part
     if intro_part: #replace with case, no documentation offline yk
         try:
-            user = users.selection_get()
-        except TclError:
+            if users.selection_get() in cfg["servers"][server]["logins"].keys():
+                user = users.selection_get()
+            else:
+                return
+        except TclError as e:
+            print(e)
             return
-    else: #replace with case, no documentation offline yk
+    else:
         try:
-            server = servers.selection_get()
-        except TclError:
+            if servers.selection_get() in cfg["servers"].keys():
+                server = servers.selection_get()
+            else:
+                return
+        except TclError as e:
+            print(e)
             welcome_count += 1
             try: welcome.configure(text=welcome_messages[welcome_count])
             except IndexError: intro.destroy()
@@ -152,6 +160,7 @@ def add():
             winadd.update()
     except TclError:
         return
+    refresh_intro()
 
 def remove():
     if intro_part: del cfg["servers"][server]["logins"][users.selection_get()]
@@ -205,7 +214,7 @@ logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 intro.wm_iconphoto(False, logo)
 
 welcome = Label(intro, text="Welcome to Meower95! Select your server:", font=("Helvetica", 10))
-servers = Listbox(intro, font=("Helvetica", 10))
+servers = Listbox(intro, font=("Helvetica", 8))
 user_title = Label(intro, text="Select your user account:", font=("Helvetica", 8))
 users = Listbox(intro, font=("Helvetica", 8))
 bback = Button(intro, text="< Back",command=back,font=("Helvetica", 8),state=DISABLED)
@@ -254,10 +263,10 @@ window.geometry("600x360")
 window.resizable(0,0)
 window.title("Meower95")
 
-logo = PhotoImage(file=os.path.realpath('meower16.png'))
+logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 window.wm_iconphoto(False, logo)
 
-proc = sp.Popen(['python3','myPyScript.py'])
+proc = sp.Popen(['python3','backend.py'])
 status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
@@ -304,8 +313,10 @@ def insert_home():
 
         messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["u"])))
         messages.tag_config(str(i),foreground="#000080")
-        
+    
+    messages.yview(END)
     messages.configure(state=DISABLED)
+    
 
 print("setting up widgets...",end="")
 
@@ -372,7 +383,10 @@ try:
             if result != '':
                 transfer.close()
                 print("new transfer data:",result)
-                result = json.loads(result)
+                try:
+                    result = json.loads(result)
+                except json.decoder.JSONDecodeError:
+                    log("JSON Error")
                 try:
                     if result["cmd"] == "direct":
                         if result["val"]["mode"] == "auth":
@@ -382,7 +396,7 @@ try:
                             insert_home()
                             log("New message, updating message list.")
                         else:
-                            log(f'Unknown direct websocket data "{["val"]["mode"]}". still running doe ;3')
+                            log(f'Unknown direct websocket data "{result["val"]["mode"]}". still running doe ;3')
                     else:
                         ws_data[result["cmd"]] = result["val"]
                 except KeyError:
@@ -395,6 +409,8 @@ try:
         window.update()
 except Exception as Error:
     sp.Popen.terminate(proc)
-
     status = sp.Popen.poll(proc)
+    raise Error
+sp.Popen.terminate(proc)
+status = sp.Popen.poll(proc)
 print("see ya")

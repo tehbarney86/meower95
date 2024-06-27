@@ -25,17 +25,23 @@ Thank you, barney86.
         lf = open("meower95.safelog","a" if exists("meower95.safelog") else "w")
         lf.write(logput)
         lf.close()
-
-import urllib.request, json, multiprocessing, os, time
+        
+import urllib.request, json, os, time
 from tkinter import *
 from tkinter import ttk
 from os.path import exists
 from subprocess import call
 from urllib.request import ssl
 from urllib.error import URLError
+import subprocess as sp
 
-welcome_messages = ("Welcome to Meower95! Select your server:",
-                    "Select a server by clicking it's title on the list below:",
+def refresh_conf():
+    global cfg,cf
+    cf = open("meower95.conf","w")
+    json.dump(cfg,cf)
+    cf.close()
+
+welcome_messages = ("Select a server by clicking it's title on the list below:",
                     "Just click a name below to continue.",
                     "Point your cursor to a server below and click.",
                     "Just do it.",
@@ -48,7 +54,7 @@ welcome_messages = ("Welcome to Meower95! Select your server:",
                     "No, you do the stuff I said first, then you click.",
                     "Okay, you're just annoying, stop trying to be funny.",
                     "Next time you click I'll crash the program.")
-welcome_count = 0
+welcome_count = -1
 intro_part = 0
 server = user = None
 
@@ -61,13 +67,21 @@ def refresh_intro():
     bback.configure(state=DISABLED if intro_part == 0 else NORMAL)
     bnext.configure(text="Chat!" if intro_part else "Next >")
     if intro_part:
-        for i in list(cfg["servers"][server]["logins"].keys()):
-            users.insert(END,i)
+        if "logins" in cfg["servers"][server]:
+            for i in list(cfg["servers"][server]["logins"].keys()):
+                users.insert(END,i)
+        else:
+            cfg["servers"][server]["logins"] = {}
+            refresh_conf()
         user_title.place(x=130,y=5)
         users.place(x=130,y=30,width=310,height=135)
     else:
-        for i in list(cfg["servers"].keys()):
-            servers.insert(END,i)
+        if "servers" in cfg:
+            for i in list(cfg["servers"].keys()):
+                servers.insert(END,i)
+        else:
+            cfg["servers"] = {}
+            refresh_conf()
             
         welcome.place(x=130,y=5)
         servers.place(x=130,y=30,width=310,height=135)
@@ -84,6 +98,8 @@ def next():
             server = servers.selection_get()
         except TclError:
             welcome_count += 1
+            try: welcome.configure(text=welcome_messages[welcome_count])
+            except IndexError: intro.destroy()
             return
     
     intro_part += 1
@@ -104,9 +120,7 @@ def add():
             cfg["servers"][entry1.get()]["http"] = entry2.get()
             cfg["servers"][entry1.get()]["websocket"] = entry3.get()
             cfg["servers"][entry1.get()]["logins"] = {}
-        cf = open("meower95.conf","w")
-        json.dump(cfg,cf)
-        cf.close()
+        refresh_conf()
         winadd.destroy()
         refresh_intro()
         
@@ -148,18 +162,49 @@ def remove():
     log("Removed",servers.selection_get(),"from the", "user" if intro_part else "server", "list.")
     refresh_intro()
 
+empty_conf = True
+if not exists("meower95.conf"):
+    empty_conf = False
+    cf = open("meower95.conf","w")
+    cf.close()
 cf = open("meower95.conf","r")
-cfg = json.load(cf)
+try:
+    cfg = json.load(cf)
+except json.decoder.JSONDecodeError as error:
+    print(cf.read())
+    if empty_conf:
+        jsonwin = Tk()
+        jsonwin.title("Meower95 - Error")
+        jsonwin.geometry("400x110")
+        jsonwin.resizable(0,0)
+        warnicon = PhotoImage(file=os.path.realpath('assets/warning.png'))
+        Label(jsonwin, image=warnicon).place(x=5,y=10)
+        Label(text='''Your configuration file (meower95.conf) might be corrupted.
+Your old JSON file is saved to meower95.conf.bak,
+and your current configuration will be reset.
+sorry :(''', justify="left", font=("Helvetica", 10)).place(x=50,y=10)
+        Button(jsonwin,text="Continue",command=jsonwin.destroy,font=("Helvetica", 10)).place(x=395,y=105,anchor="se")
+        jsonwin.mainloop()
+        
+        cfb = open("meower95.conf.bak","w")
+        cfb.write(cf.read())
+        
+        cfb.close()
+        
+        cfg = {}
+        refresh_conf()
+    else: cfg = {}
 cf.close()
 
 intro = Tk()
 intro.geometry("450x210")
 intro.title("Meower95 - Quick login")
+intro.resizable(0,0)
 
-logo = PhotoImage(file=os.path.realpath('meower16.png'))
+logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 intro.wm_iconphoto(False, logo)
 
-welcome = Label(intro, font=("Helvetica", 10))
+welcome = Label(intro, text="Welcome to Meower95! Select your server:", font=("Helvetica", 10))
 servers = Listbox(intro, font=("Helvetica", 10))
 user_title = Label(intro, text="Select your user account:", font=("Helvetica", 8))
 users = Listbox(intro, font=("Helvetica", 8))
@@ -169,7 +214,7 @@ badd = Button(intro, text="Add...",command=add,font=("Helvetica", 8))
 bdel = Button(intro, text="Remove",command=remove,font=("Helvetica", 8))
 sep = ttk.Separator(intro,orient='horizontal')
 
-introsplash = PhotoImage(file=os.path.realpath('intro.png'))
+introsplash = PhotoImage(file=os.path.realpath('assets/intro.png'))
 
 bback.place(x=130,y=205,anchor="sw")
 bnext.place(x=440,y=205,anchor="se")
@@ -185,10 +230,8 @@ introcanvas.place(x=3,y=5)
 refresh_intro()
 
 try:
-    while intro.wm_state() == "normal" and intro_part < 2:
+    while intro_part < 2:
         intro.update()
-        try: welcome.configure(text=welcome_messages[welcome_count])
-        except IndexError: exit()
     intro.quit()
     intro.destroy()
 except TclError:
@@ -199,9 +242,7 @@ if not server or not user: exit()
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
-cf = open("meower95.conf","w")
-json.dump(cfg,cf)
-cf.close()
+refresh_conf()
 
 def backend():
     call(["python3", "backend.py"])
@@ -216,8 +257,8 @@ window.title("Meower95")
 logo = PhotoImage(file=os.path.realpath('meower16.png'))
 window.wm_iconphoto(False, logo)
 
-proc = multiprocessing.Process(target=backend, args=())
-proc.start()
+proc = sp.Popen(['python3','myPyScript.py'])
+status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
     log("Sending", content, "to", cfg["servers"][server]["http"] + link, safe = True)
@@ -353,7 +394,7 @@ try:
             pass
         window.update()
 except Exception as Error:
-    os.system("kill -15 " + str(proc.pid + 2))
-    raise Error
-os.system("kill -15 " + str(proc.pid + 2))
+    sp.Popen.terminate(proc)
+
+    status = sp.Popen.poll(proc)
 print("see ya")

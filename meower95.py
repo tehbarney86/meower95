@@ -252,9 +252,6 @@ cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
 refresh_conf()
 
-def backend():
-    call(["python3", "backend.py"])
-
 def donothing():print("boo")
 
 window = Tk()
@@ -382,23 +379,23 @@ try:
             if result != '':
                 transfer.close()
                 print("new transfer data:",result)
-                try:
-                    result = json.loads(result)
-                except json.decoder.JSONDecodeError:
-                    log("JSON Error")
-                try:
-                    if result["cmd"] == "direct":
+                result = json.loads(result)
+                if result["cmd"] == "direct":
+                    if type(result["val"]) == str:
+                        if result["val"] == "E:020 | Kicked":
+                            entry.delete(0.0,END)
+                            entry.insert("You were kicked from this server :(")
+                            entry.configure(state=DISABLED)
+                    elif "mode" in result["val"]:
                         if result["val"]["mode"] == "auth":
                             ws_data["userdata"] = result["val"]
                             log("Auth data received.")
                         elif result["val"]["mode"] == 1:
                             insert_home()
                             log("New message, updating message list.")
-                        else:
-                            log(f'Unknown direct websocket data "{result["val"]["mode"]}". still running doe ;3')
                     else:
-                        ws_data[result["cmd"]] = result["val"]
-                except KeyError:
+                        log(f'Unknown direct websocket data. still running doe ;3')
+                else:
                     ws_data[result["cmd"]] = result["val"]
                 transfer = open("TRANSFER","w")
                 transfer.write("")

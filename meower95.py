@@ -6,7 +6,7 @@ Please do not share this file to anybody you don't know or trust.
 This file can contain valuable information like your Meower
 account passwords, tokens and etc. that can be used for malicious
 intent by databrokers and trouble makers.
-If you still need help online, share the contents of the file
+If you stil need help online, share the contents of the file
 meower95.safelog, as it contains only the important problems you
 might face while using the program.
 
@@ -66,9 +66,9 @@ def refresh_intro():
     welcome.place_forget()
     bback.configure(state=DISABLED if intro_part == 0 else NORMAL)
     bnext.configure(text="Chat!" if intro_part else "Next >")
-    if intro_part:
-        if intro_part == 2:
-            intro.destroy()
+    if intro_part > 1:
+        intro.destroy()
+    elif intro_part:
         if "logins" in cfg["servers"][server]:
             for i in list(cfg["servers"][server]["logins"].keys()):
                 users.insert(END,i)
@@ -255,7 +255,6 @@ refresh_conf()
 def donothing():print("boo")
 
 window = Tk()
-window.geometry("600x360")
 window.resizable(0,0)
 window.title("Meower95")
 
@@ -304,57 +303,77 @@ def insert_home():
     for i in range(0,len(home)):
         home[i]["u"] = home[i]["u"].replace("\n","")
         messages.mark_set(str(i),END)
-        
-        messages.insert(END,str(home[i]["u"]+': '+home[i]["p"]+"\n").encode('utf-16', 'surrogatepass').decode('utf-16'))
+        if home[i]["u"] == "Discord":
+            messages.insert(END,str(home[i]["p"]+"\n").encode('utf-16', 'surrogatepass').decode('utf-16'))
+            messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["p"].split(":")[0])))
+            messages.tag_config(str(i),foreground="#800080")
+    
+        else:
+            messages.insert(END,str(home[i]["u"]+': '+home[i]["p"]+"\n").encode('utf-16', 'surrogatepass').decode('utf-16'))
 
-        messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["u"])))
-        messages.tag_config(str(i),foreground="#000080")
+            messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["u"])))
+            messages.tag_config(str(i),foreground="#008000" if home[i]["u"] == user else "#000080")
     
     messages.yview(END)
     messages.configure(state=DISABLED)
     
+def refresh_users():
+    userlist.delete(0,END)
+    for u in ws_data["ulist"].split(";"):
+        userlist.insert(END,u)
+        if u == user:
+            userlist.itemconfig(END, {'fg':"#008000"})
+        else:
+            userlist.itemconfig(END, {'fg':"#000080"})
+            
+def refresh_view():
+    global cfg
+    for i in ("channels","messages","userlist"):
+        eval(i + ".place_forget()")
+    if not "view" in cfg:
+        cfg["view"] = 1
+        #refresh_conf()
+    show = bin(cfg["view"]).removeprefix("0b")
+    show = "0" * (2 - len(show)) + show
+    show = [bool(int(show[0])),bool(int(show[1]))]
+    window.geometry(str(472 + sum(show) * 128) + "x360")
+    if show[0]: channels.place(x=0,y=0,width=128,height=360)
+    messages.place(x=128 if show[0] else 0,y=0,height=320,width=472)
+    if show[1]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=360)
+    userlabel.place(x=130 if show[0] else 2,y=340,anchor="w")
+    entry.place(x=390  if show[0] else 262,y=340,width=360,anchor="center")
 
+def toggle_view(index):
+    show = bin(cfg["view"]).removeprefix("0b")
+    show = "0" * (2 - len(show)) + show
+    show = [bool(int(show[0])),bool(int(show[1]))]
+    show[index] = not show[index]
+    cfg["view"] = int(f"{int(show[0])}{int(show[1])}",2)
+    refresh_conf()
+    refresh_view()    
+    
 print("setting up widgets...",end="")
 
 menubar = Menu(window,relief=FLAT, font=('Helvetica', 8))
-filemenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
-filemenu.add_command(label="New", command=donothing, font=('Helvetica', 8))
-filemenu.add_command(label="Open", command=donothing, font=('Helvetica', 8))
-filemenu.add_command(label="Save", command=donothing, font=('Helvetica', 8))
-filemenu.add_command(label="Save as...", command=donothing, font=('Helvetica', 8))
-filemenu.add_command(label="Close", command=donothing, font=('Helvetica', 8))
+mainmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
+mainmenu.add_command(label="Switch server...", command=donothing, font=('Helvetica', 8))
+mainmenu.add_command(label="Switch account...", command=donothing, font=('Helvetica', 8))
+mainmenu.add_separator()
+mainmenu.add_command(label="Exit", command=window.destroy, font=('Helvetica', 8))
+menubar.add_cascade(label="Meower95", menu=mainmenu)
 
-filemenu.add_separator()
-filemenu.add_command(label="Exit", command=window.quit, font=('Helvetica', 8))
-menubar.add_cascade(label="File", menu=filemenu)
-editmenu = Menu(menubar, tearoff=0)
-editmenu.add_command(label="Undo", command=donothing, font=('Helvetica', 8))
-editmenu.add_separator()
-editmenu.add_command(label="Cut", command=donothing, font=('Helvetica', 8))
-editmenu.add_command(label="Copy", command=donothing, font=('Helvetica', 8))
-editmenu.add_command(label="Paste", command=donothing, font=('Helvetica', 8))
-editmenu.add_command(label="Delete", command=donothing, font=('Helvetica', 8))
-editmenu.add_command(label="Select All", command=donothing, font=('Helvetica', 8))
-
-menubar.add_cascade(label="Edit", menu=editmenu, font=('Helvetica', 8))
-helpmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
-helpmenu.add_command(label="Help Index", command=donothing, font=('Helvetica', 8))
-helpmenu.add_command(label="About...", command=donothing, font=('Helvetica', 8))
-menubar.add_cascade(label="Help", menu=helpmenu, font=('Helvetica', 8))
+viewmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
+viewmenu.add_command(label="Chat sidebar", command=lambda: toggle_view(0), font=('Helvetica', 8))
+viewmenu.add_command(label="User sidebar", command=lambda: toggle_view(1), font=('Helvetica', 8))
+menubar.add_cascade(label="View", menu=viewmenu)
 
 messages = Text(state=DISABLED, font=('Courier', 12),wrap=WORD)
-messages.place(x=128,y=0,height=320,width=472)
-
 channels = Listbox(font=('Helvetica', 8))
-channels.place(x=0,y=0,width=128,height=360)
-
+userlist = Listbox(font=('Helvetica', 8))
 userlabel = Label(text=user+":", font=('Helvetica', 8))
-userlabel.place(x=130,y=340,anchor="w")
-
 entry = Entry(relief="ridge", font=('Courier', 12))
-entry.place(x=390,y=340,width=360,anchor="center")
-
 entry.bind("<Return>",send_msg)
+refresh_view()
 
 window.config(menu=menubar)
 
@@ -375,11 +394,15 @@ try:
             break
         try:
             transfer = open("TRANSFER","r")
-            result = transfer.read()
+            try:
+                result = json.load(transfer)
+            except json.decoder.JSONDecodeError:
+                transfer = open("TRANSFER","w")
+                transfer.close()
+                result = ''
             if result != '':
                 transfer.close()
                 print("new transfer data:",result)
-                result = json.loads(result)
                 if result["cmd"] == "direct":
                     if type(result["val"]) == str:
                         if result["val"] == "E:020 | Kicked":
@@ -389,14 +412,22 @@ try:
                     elif "mode" in result["val"]:
                         if result["val"]["mode"] == "auth":
                             ws_data["userdata"] = result["val"]
-                            log("Auth data received.")
+                            log("Auth data received.",safe=True)
+                            if "ban" in ws_data["userdata"]["payload"]["account"]:
+                                if not ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "none":
+                                    print(ws_data["userdata"]["payload"]["account"]["ban"])
+                                    entry.delete(0,END)
+                                    entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
+                                    entry.configure(state=DISABLED)
                         elif result["val"]["mode"] == 1:
                             insert_home()
-                            log("New message, updating message list.")
+                            log("New message, updating message list.",safe=True)
                     else:
-                        log(f'Unknown direct websocket data. still running doe ;3')
+                        log(f'Unknown direct websocket data. still running doe ;3',safe=True)
                 else:
                     ws_data[result["cmd"]] = result["val"]
+                    if result["cmd"] == "ulist":
+                        refresh_users()
                 transfer = open("TRANSFER","w")
                 transfer.write("")
             transfer.close()

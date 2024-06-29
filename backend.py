@@ -8,13 +8,12 @@ def writefile():
     try:
         transfer = open("TRANSFER","w")
         recv = websocket.recv()
-        print(recv)
         transfer.write(recv)
         transfer.close()
     except ConnectionClosedError:
+        websocket.close()
         websocket = connect(cfg["servers"][server]["http"])
         websocket.send('{"cmd": "direct", "val": {"username": "' + user + '", "pswd": "' + cfg["servers"][server]["logins"][user] + '"}}')
-        print("packet sent")
 
 cf = open("meower95.conf","r")
 cfg = json.load(cf)

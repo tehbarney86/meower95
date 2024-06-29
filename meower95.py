@@ -1,3 +1,13 @@
+import urllib.request, json, os, time
+from tkinter import *
+from tkinter import ttk
+from os.path import exists
+from subprocess import call
+from urllib.request import ssl
+from urllib.error import URLError
+import subprocess as sp
+from sys import executable
+
 def log(*args,sep=" ",safe=False):
     if not exists("meower95.log"):
         lf = open("meower95.log","w")
@@ -6,7 +16,7 @@ Please do not share this file to anybody you don't know or trust.
 This file can contain valuable information like your Meower
 account passwords, tokens and etc. that can be used for malicious
 intent by databrokers and trouble makers.
-If you stil need help online, share the contents of the file
+If you still need help online, share the contents of the file
 meower95.safelog, as it contains only the important problems you
 might face while using the program.
 
@@ -25,15 +35,6 @@ Thank you, barney86.
         lf = open("meower95.safelog","a" if exists("meower95.safelog") else "w")
         lf.write(logput)
         lf.close()
-        
-import urllib.request, json, os, time
-from tkinter import *
-from tkinter import ttk
-from os.path import exists
-from subprocess import call
-from urllib.request import ssl
-from urllib.error import URLError
-import subprocess as sp
 
 def refresh_conf():
     global cfg,cf
@@ -61,8 +62,8 @@ server = user = None
 def refresh_intro():
     users.delete(0,END)
     servers.delete(0,END)
-    for i in ("welcome","servers","user_title","users"):
-        eval(i+".place_forget()")
+    for i in (welcome,servers,user_title,users):
+        i.place_forget()
     welcome.place_forget()
     bback.configure(state=DISABLED if intro_part == 0 else NORMAL)
     bnext.configure(text="Chat!" if intro_part else "Next >")
@@ -261,7 +262,7 @@ window.title("Meower95")
 logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 window.wm_iconphoto(False, logo)
 
-proc = sp.Popen(['python3','backend.py'])
+proc = sp.Popen([sys.executable,'backend.py'])
 status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
@@ -317,19 +318,33 @@ def insert_home():
     messages.yview(END)
     messages.configure(state=DISABLED)
     
+pfps = {}
+for p in os.listdir("assets/pfps/"):
+    pfps[os.path.splitext(p)[0]] = PhotoImage(file=os.path.realpath(f'assets/pfps/{p}'))
+usrcache = {}
+
 def refresh_users():
-    userlist.delete(0,END)
+    global pfpcache
+    for i in userlist.get_children():
+        userlist.delete(i)
     for u in ws_data["ulist"].split(";"):
-        userlist.insert(END,u)
-        if u == user:
-            userlist.itemconfig(END, {'fg':"#008000"})
-        else:
-            userlist.itemconfig(END, {'fg':"#000080"})
+        if u != "":
+            if not u in usrcache:
+                print(u)
+                usrcache[u] = readhttp(f"users/{u}")
+            if u in pfps:
+                userlist.insert("",END,text=" "+u,image=pfps[u])
+            elif str(usrcache[u]['pfp_data']) in pfps:
+                userlist.insert("",END,text=" "+u,image=pfps[str(usrcache[u]['pfp_data'])])
+            else:
+                userlist.insert("",END,text=" "+u)
             
+            window.update()
+
 def refresh_view():
     global cfg
-    for i in ("channels","messages","userlist"):
-        eval(i + ".place_forget()")
+    for i in (channels,messages,userlist):
+        i.place_forget()
     if not "view" in cfg:
         cfg["view"] = 1
         #refresh_conf()
@@ -354,6 +369,9 @@ def toggle_view(index):
     
 print("setting up widgets...",end="")
 
+style = ttk.Style()
+style.configure('.', font=('Helvetica', 8))
+
 menubar = Menu(window,relief=FLAT, font=('Helvetica', 8))
 mainmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
 mainmenu.add_command(label="Switch server...", command=donothing, font=('Helvetica', 8))
@@ -369,9 +387,11 @@ menubar.add_cascade(label="View", menu=viewmenu)
 
 messages = Text(state=DISABLED, font=('Courier', 12),wrap=WORD)
 channels = Listbox(font=('Helvetica', 8))
-userlist = Listbox(font=('Helvetica', 8))
+userlist = ttk.Treeview(padding=0,show='tree')
 userlabel = Label(text=user+":", font=('Helvetica', 8))
-entry = Entry(relief="ridge", font=('Courier', 12))
+entry = Entry(relief="ridge",font=('Courier', 12))
+entry.insert(0,"Waiting for authentification...")
+entry.configure(state=DISABLED)
 entry.bind("<Return>",send_msg)
 refresh_view()
 
@@ -413,13 +433,14 @@ try:
                         if result["val"]["mode"] == "auth":
                             ws_data["userdata"] = result["val"]
                             log("Auth data received.",safe=True)
-                            if "ban" in ws_data["userdata"]["payload"]["account"]:
-                                if not ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "none":
-                                    print(ws_data["userdata"]["payload"]["account"]["ban"])
-                                    entry.delete(0,END)
-                                    entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
-                                    entry.configure(state=DISABLED)
-                        elif result["val"]["mode"] == 1:
+                            entry.configure(state=NORMAL)
+                            entry.delete(0,END)
+                            if not ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "none":
+                                entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
+                                entry.configure(state=DISABLED)
+                            else:
+                                entry.configure(state=NORMAL)
+                        elif result["val"]["mode"] in (1,"delete","edit"):
                             insert_home()
                             log("New message, updating message list.",safe=True)
                     else:

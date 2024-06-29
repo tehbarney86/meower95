@@ -262,7 +262,7 @@ window.title("Meower95")
 logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 window.wm_iconphoto(False, logo)
 
-proc = sp.Popen([sys.executable,'backend.py'])
+proc = sp.Popen([executable,'backend.py'])
 status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):

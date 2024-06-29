@@ -435,7 +435,7 @@ try:
                             log("Auth data received.",safe=True)
                             entry.configure(state=NORMAL)
                             entry.delete(0,END)
-                            if not ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "none":
+                            if ws_data["userdata"]["payload"]["account"]["ban"]["restrictions"] != 0:
                                 entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
                                 entry.configure(state=DISABLED)
                             else:

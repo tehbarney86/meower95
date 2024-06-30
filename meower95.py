@@ -293,6 +293,31 @@ def get_users(user):
 
     return data
 
+emojis = {}
+for e in os.listdir("assets/emojis/"):
+    emojis[os.path.splitext(e)[0]] = PhotoImage(file=os.path.realpath(f'assets/emojis/{e}'))
+
+def process_text(text):
+    result = []
+    words = []
+    for word in emojis.keys():
+        last = 0
+        for i in range(0,text.count(word)):
+            words.append([text.index(word,last), word])
+            last = text.index(word,last) + 1
+    try:
+        result.append(text[0:words[0][0]])
+    except IndexError:
+        return [text]
+    for i in range(0,len(words)):
+        result.append(words[i][1])
+        try:
+            result.append(text[words[i][0]+len(words[i][1]):words[i+1][0]])
+        except IndexError:
+            pass
+    result.append(text[words[i][0]+len(words[i][1]):len(text)])
+    return result
+    
 def insert_home():
     text = ""
     home = readhttp("home?autoget=1")["autoget"]
@@ -305,15 +330,19 @@ def insert_home():
         home[i]["u"] = home[i]["u"].replace("\n","")
         messages.mark_set(str(i),END)
         if home[i]["u"] == "Discord":
-            messages.insert(END,str(home[i]["p"]+"\n").encode('utf-16', 'surrogatepass').decode('utf-16'))
-            messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["p"].split(":")[0])))
-            messages.tag_config(str(i),foreground="#800080")
-    
+            messages.insert(END,home[i]["p"].split(": ")[0])
+            text = ": ".join(home[i]["p"].split(": ")[1:len(home[i]["p"].split(":"))]).encode('utf-16', 'surrogatepass').decode('utf-16')
         else:
-            messages.insert(END,str(home[i]["u"]+': '+home[i]["p"]+"\n").encode('utf-16', 'surrogatepass').decode('utf-16'))
-
-            messages.tag_add(str(i),str(int(messages.index(str(i)).split(".")[0])-2)+".0", str(int(messages.index(str(i)).split(".")[0])-2)+"."+str(len(home[i]["u"])))
-            messages.tag_config(str(i),foreground="#008000" if home[i]["u"] == user else "#000080")
+            messages.insert(END,home[i]["u"])
+            text = home[i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
+        text = process_text(text)
+        messages.insert(END,': ')
+        for i in text:
+            if i in emojis.keys():
+                messages.image_create(END, image = emojis[i])
+            else:
+                messages.insert(END,i)
+        messages.insert(END,"\n")
     
     messages.yview(END)
     messages.configure(state=DISABLED)

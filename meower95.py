@@ -278,6 +278,11 @@ def sendhttp(link,content):
 def readhttp(link):
     log("Reading", cfg["servers"][server]["http"] + link, safe = True)
     req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': 'Meower95'})
+    req.add_header('Username', user)
+    try:
+        req.add_header('Token', ws_data["userdata"]["payload"]["token"])
+    except KeyError:
+        pass
     url = urllib.request.urlopen(req)
     data = json.load(url)
     
@@ -294,8 +299,11 @@ def get_users(user):
     return data
 
 emojis = {}
-for e in os.listdir("assets/emojis/"):
-    emojis[os.path.splitext(e)[0]] = PhotoImage(file=os.path.realpath(f'assets/emojis/{e}'))
+ef = open("assets/emojis/emojis.conf")
+emojiconf = json.load(ef)
+ef.close()
+for e in emojiconf.keys():
+    emojis[e] = PhotoImage(file=os.path.realpath(f'assets/emojis/{emojiconf[e]}'))
 
 def process_text(text):
     result = []
@@ -452,19 +460,26 @@ try:
             if result != '':
                 transfer.close()
                 print("new transfer data:",result)
-                if result["cmd"] == "direct":
+                if result ["cmd"] == "statuscode":
                     if type(result["val"]) == str:
                         if result["val"] == "E:020 | Kicked":
-                            entry.delete(0.0,END)
-                            entry.insert("You were kicked from this server :(")
+                            entry.configure(state=NORMAL)
+                            entry.delete(0,END)
+                            entry.insert(END,"You were kicked from this server :(")
                             entry.configure(state=DISABLED)
-                    elif "mode" in result["val"]:
+                        elif result["val"] == "E:018 | Account Banned":
+                            entry.configure(state=NORMAL)
+                            entry.delete(0,END)
+                            entry.insert(END,"You were banned from this server :(")
+                            entry.configure(state=DISABLED)
+                elif result["cmd"] == "direct":
+                    if "mode" in result["val"]:
                         if result["val"]["mode"] == "auth":
                             ws_data["userdata"] = result["val"]
                             log("Auth data received.",safe=True)
                             entry.configure(state=NORMAL)
                             entry.delete(0,END)
-                            if ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "perm_restriction" or ws_data["userdata"]["payload"]["account"]["ban"]["expires"] != 0:
+                            if ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "perm_restriction":
                                 entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
                                 entry.configure(state=DISABLED)
                             else:
@@ -472,14 +487,21 @@ try:
                         elif result["val"]["mode"] in (1,"delete","edit"):
                             insert_home()
                             log("New message, updating message list.",safe=True)
-                    else:
+                        elif result["val"]["mode"] == "banned":
+                            print(time.time(),result["val"]["payload"]["expires"] > time.time())
+                            entry.delete(0,END)
+                            entry.configure(state=NORMAL)
+                            if result["val"]["payload"]["state"] == "temp_ban" and result["val"]["payload"]["expires"] > time.time() or result["val"]["payload"]["state"] == "perm_ban":
+                                entry.insert(END,f'You\'re banned for {result["val"]["payload"]["reason"]} :(')
+                                entry.configure(state=DISABLED)
                         log(f'Unknown direct websocket data. still running doe ;3',safe=True)
                 else:
                     ws_data[result["cmd"]] = result["val"]
                     if result["cmd"] == "ulist":
                         refresh_users()
-                transfer = open("TRANSFER","w")
-                transfer.write("")
+               
+            transfer = open("TRANSFER","w")
+            transfer.write("")
             transfer.close()
         except FileNotFoundError:
             pass

@@ -4,7 +4,7 @@ Meower95 is a new lightweight, cute and Windows-styled Meower client designed fo
 * Simple IRC-like layout;
 * Locally setting up avatars for other accounts;
 * Standard emojis like ":3" convert into image emojis;
-* Good-old Windows 95 simple look (unless you're on windows 10/11 lol)
+* Good-old Windows 95 simple look (unless you're on windows 11 lol)
 ## Setting up
 (Meower95 is just in development and sometimes unstable, so please if any bugs appear, report them to our issues)
 

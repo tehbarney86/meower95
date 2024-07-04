@@ -1,10 +1,7 @@
-import urllib.request, json, os, time
+import urllib.request, json, os, time, random, base64
 from tkinter import *
 from tkinter import ttk
 from os.path import exists
-from subprocess import call
-from urllib.request import ssl
-from urllib.error import URLError
 import subprocess as sp
 from sys import executable
 
@@ -29,11 +26,11 @@ Thank you, barney86.
     lf = open("meower95.log","a")
     t = time.gmtime()
     logput = f"{t[0]}.{t[1]}.{t[2]} {t[3]}:{t[4]}:{t[5]}: " + sep.join(args)
-    lf.write(logput)
+    lf.write(logput + "\n")
     lf.close()
     if safe:
         lf = open("meower95.safelog","a" if exists("meower95.safelog") else "w")
-        lf.write(logput)
+        lf.write(logput + "\n")
         lf.close()
 
 def refresh_conf():
@@ -58,6 +55,9 @@ welcome_messages = ("Select a server by clicking it's title on the list below:",
 welcome_count = -1
 intro_part = 0
 server = user = None
+useragent = ""
+for i in range(0,8):
+    useragent += random.choice("qwertyuiopasdfghjklzxcvbnm1234567890")
 
 def refresh_intro():
     users.delete(0,END)
@@ -116,6 +116,14 @@ def next():
     intro_part += 1
     refresh_intro()
 
+def register(username,password):
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "auth/register", headers={'User-Agent': useragent})
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
+    jsondata = json.dumps({"username":username,"password":password}).encode('utf-8')
+    req.add_header('Content-Length', len(jsondata))
+    print(urllib.request.urlopen(req, jsondata).read())
+    return urllib.request.urlopen(req, jsondata)
+
 def back():
     global intro_part
     if intro_part > 0: intro_part -= 1
@@ -129,6 +137,8 @@ def add():
         else:
             cfg["servers"][entry1.get()] = {}
             cfg["servers"][entry1.get()]["http"] = entry2.get()
+            if cfg["servers"][entry1.get()]["http"][len(cfg["servers"][entry1.get()]["http"])] != "/":
+                cfg["servers"][entry1.get()]["http"] += "/"
             cfg["servers"][entry1.get()]["websocket"] = entry3.get()
             cfg["servers"][entry1.get()]["logins"] = {}
         refresh_conf()
@@ -146,8 +156,8 @@ def add():
     entry2 = Entry(winadd,font=("Helvetica", 8))
     if intro_part:
         entry2.configure(show="•")
-        register = Button(winadd,text="Register account",font=("Helvetica", 8),state=DISABLED)
-        register.place(x=140,y=85,anchor="s")
+        reg = Button(winadd,text="Register account",font=("Helvetica", 8),state=DISABLED,command=lambda: register(entry1.get(),entry2.get()) )
+        reg.place(x=140,y=85,anchor="s")
     else:
         Label(winadd,text="WS(S) server:", font=("Helvetica", 8)).place(x=110,y=60,anchor="e")
         entry3 = Entry(winadd,font=("Helvetica", 8))
@@ -218,7 +228,7 @@ intro.wm_iconphoto(False, logo)
 
 welcome = Label(intro, text="Welcome to Meower95! Select your server:", font=("Helvetica", 10))
 servers = Listbox(intro, font=("Helvetica", 8))
-user_title = Label(intro, text="Select your user account:", font=("Helvetica", 8))
+user_title = Label(intro, text="Select your user account:", font=("Helvetica", 10))
 users = Listbox(intro, font=("Helvetica", 8))
 bback = Button(intro, text="< Back",command=back,font=("Helvetica", 8),state=DISABLED)
 bnext = Button(intro,command=next,font=("Helvetica", 8))
@@ -247,13 +257,12 @@ except TclError:
     pass
 
 if not server or not user: exit()
-
+if not "settings" in cfg:
+    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"discordcorrupt":False,"base64":False}
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
 refresh_conf()
-
-def donothing():print("boo")
 
 window = Tk()
 window.resizable(0,0)
@@ -266,8 +275,9 @@ proc = sp.Popen([executable,'backend.py'])
 status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
+    print(link,content)
     log("Sending", content, "to", cfg["servers"][server]["http"] + link, safe = True)
-    req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': 'Meower95'})
+    req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': useragent})
     req.add_header('Content-Type', 'application/json; charset=utf-8')
     req.add_header('Username', user)
     req.add_header('Token', ws_data["userdata"]["payload"]["token"])
@@ -275,22 +285,42 @@ def sendhttp(link,content):
     req.add_header('Content-Length', len(jsondata))
     return urllib.request.urlopen(req, jsondata)
 
+
 def readhttp(link):
     log("Reading", cfg["servers"][server]["http"] + link, safe = True)
-    req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': 'Meower95'})
+    req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': useragent})
     req.add_header('Username', user)
     try:
         req.add_header('Token', ws_data["userdata"]["payload"]["token"])
     except KeyError:
         pass
-    url = urllib.request.urlopen(req)
-    data = json.load(url)
-    
-    return data
+    try:
+        url = urllib.request.urlopen(req)
+        data = json.load(url)
+        
+        return data
+    except urllib.error.URLError as e:
+        return {}
+
+def edit_msg(id="",content=""):
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "posts?id=" + id, headers={'User-Agent': useragent}, method='PATCH')
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
+    req.add_header('Username', user)
+    req.add_header('Token', ws_data["userdata"]["payload"]["token"])
+    jsondata = json.dumps({"content": content,"username":user,"pswd":cfg["servers"][server]["logins"][user]}).encode('utf-8')
+    req.add_header('Content-Length', len(jsondata))
+    return urllib.request.urlopen(req, jsondata)
 
 def send_msg(event):
-    sendhttp("home",entry.get())
+    text = entry.get()
+    if cfg["settings"]["base64"]:
+        text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
     entry.delete(0,END)
+    if cfg["settings"]["discordcorrupt"]:
+        text_id = json.load(sendhttp(channel,"From "+user+" to everyone except users of the Discord Bridge."))["_id"]
+        edit_msg(text_id,text)
+    else:
+        sendhttp(channel,text)
     
 def get_users(user):
     url = urllib.request.urlopen(cfg["servers"][server]["http"] + "users/" + user)
@@ -304,6 +334,101 @@ emojiconf = json.load(ef)
 ef.close()
 for e in emojiconf.keys():
     emojis[e] = PhotoImage(file=os.path.realpath(f'assets/emojis/{emojiconf[e]}'))
+
+def settings():
+    global ivars
+    def setvar(variable,widget):
+        cfg["settings"][variable] = widget.instate(['selected'])
+        refresh_conf()
+        print(variable)
+        print(cfg["settings"])
+    settings = Tk()
+    settings.title("Meower95 - Settings")
+    settings.geometry("480x320")
+    settings.resizable(0,0)
+    
+    sstyle = ttk.Style(settings)
+    sstyle.configure("TNotebook",font=("Helvetica",10))
+    
+    notebook = ttk.Notebook(settings)
+    notebook.place(x=5,y=5,width=470,height=312)
+
+    misc = Frame(notebook)
+    sounds = Frame(notebook)
+    hacks = Frame(notebook)
+
+    notebook.add(misc,text="Misc.")
+    #notebook.add(sounds,text="Sound") cant test it on my netbook :(
+    notebook.add(hacks,text="Hacks")
+    # Misc
+    emoji = ttk.Checkbutton(misc,text="Convert text emojis into pictures")
+    emoji.configure(command=lambda: setvar("emoji",emoji))
+    emoji.place(x=30,y=20)
+    markdown = ttk.Checkbutton(misc,text="Markdown support",state=DISABLED)
+    markdown.configure(command=lambda: setvar("markdown",markdown))
+    markdown.place(x=30,y=50)
+    avatars = ttk.Checkbutton(misc,text="Load avatars")
+    avatars.configure(command=lambda: setvar("avatars",avatars))
+    avatars.place(x=30,y=80)
+    
+    msgdel = ttk.Checkbutton(hacks,text="Don't hide messages on deletion")
+    msgdel.configure(command=lambda: setvar("msgdel",msgdel))
+    msgdel.place(x=30,y=20)
+    discordcorrupt = ttk.Checkbutton(hacks,text="Corrupt messages for Discord Bridge")
+    discordcorrupt.configure(command=lambda: setvar("discordcorrupt",discordcorrupt))
+    discordcorrupt.place(x=30,y=50)
+    base64 = ttk.Checkbutton(hacks,text="Base64 encryption")
+    base64.configure(command=lambda: setvar("base64",base64))
+    base64.place(x=30,y=80)
+    
+    for i in cfg["settings"].keys():
+        eval(i).state(['!alternate'])
+        if cfg["settings"][i]: eval(i).state(['selected'])
+    
+    while True:
+        settings.update()
+        try:
+            if not settings.winfo_exists(): break
+        except TclError:
+            break
+def edit_gui(post):
+    def finish_editing():
+        text = edittext.get(0.0,END)
+        if cfg["settings"]["base64"]:
+            text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
+        edit_msg(post["_id"],text)
+        winedit.destroy()
+    
+    winedit = Tk()
+    winedit.geometry("480x240")
+    winedit.resizable(0,0)
+    
+    edittext = Text(winedit)
+    edittext.place(x=5,y=5,width=470,height=190)
+    Button(winedit,text="Cancel",command=winedit.destroy).place(x=5,y=235,anchor="sw")
+    Button(winedit,text="Edit!",command=finish_editing).place(x=475,y=235,anchor="se")
+    
+    text = home[post["post_origin"]][index_by_id(post["_id"])]["p"]
+    
+    try:
+        if text[0:3] == "ec[":
+            text = str(base64.b64decode(text.split("]:")[len(text.split("]:"))-1]),"utf8")
+        if text[0:3] == "rr:":
+            text = str(base64.b64decode(text[3:len(text)]),"utf8")
+    except IndexError:
+        pass
+    except UnicodeError:
+        pass
+    except base64.binascii.Error:
+        pass
+    edittext.insert(0.0,text)
+    
+    while True:
+        winedit.update()
+        try:
+            if not winedit.winfo_exists(): break
+        except TclError:
+            break
 
 def process_text(text):
     result = []
@@ -325,31 +450,96 @@ def process_text(text):
             pass
     result.append(text[words[i][0]+len(words[i][1]):len(text)])
     return result
-    
+
+home = {}
+imagecache = {}
+
+def load_image(id,name):
+    if not exists(os.path.realpath("assets/cache/" + name)):
+        url = urllib.request.Request("https://uploads.meower.org/attachments/"+id+"/"+name, headers={'User-Agent': 'Meower95',"Username":user})
+        url.add_header('Token', ws_data["userdata"]["payload"]["token"])
+
+        img = urllib.request.urlopen(url)
+        
+        image = open(os.path.realpath("assets/cache/" + name),"wb")
+        image.write(img.read())
+        image.close()
+    return os.path.realpath("assets/cache/" + name)
+
 def insert_home():
-    text = ""
-    home = readhttp("home?autoget=1")["autoget"]
-    home.reverse()
-    
+    global imagecache
+    text = ""    
     messages.tag_remove(0.0,END)
     messages.configure(state=NORMAL)
     messages.delete(0.0,END)
-    for i in range(0,len(home)):
-        home[i]["u"] = home[i]["u"].replace("\n","")
+    if channel not in home:
+        try:
+            home[channel] = readhttp(channel + "?autoget=1")["autoget"]
+        except KeyError as e:
+            messages.insert(END,"Cannot connect to the server, try again later.\n\n",("nonet"))
+            messages.tag_configure("nonet",foreground="gray")
+            messages.image_create(END, image = emojis["X("])
+            return
+            
+        home[channel].reverse()
+    for i in range(0,len(home[channel])):
+        try:
+            if home[channel][i]["p"][0:3] == "ec[":
+                home[channel][i]["p"] = str(base64.b64decode(home[channel][i]["p"].split("]:")[len(home[channel][i]["p"].split("]:"))-1]),"utf8")
+            if home[channel][i]["p"][0:3] == "rr:":
+                home[channel][i]["p"] = str(base64.b64decode(home[channel][i]["p"][3:len(home[channel][i]["p"])]),"utf8")
+        except IndexError:
+            pass
+        except UnicodeError:
+            pass
+        except base64.binascii.Error:
+            pass
+        home[channel][i]["u"] = home[channel][i]["u"].replace("\n","")
         messages.mark_set(str(i),END)
-        if home[i]["u"] == "Discord":
-            messages.insert(END,home[i]["p"].split(": ")[0])
-            text = ": ".join(home[i]["p"].split(": ")[1:len(home[i]["p"].split(":"))]).encode('utf-16', 'surrogatepass').decode('utf-16')
+        if home[channel][i]["u"] in ["Discord"]: #known bridges, maybe add phone support later (if it even works today)
+            color = "#800080"
+            user = home[channel][i]["p"].split(": ")[0]
+            text = ": ".join(home[channel][i]["p"].split(": ")[1:len(home[channel][i]["p"].split(":"))]).encode('utf-16', 'surrogatepass').decode('utf-16')
         else:
-            messages.insert(END,home[i]["u"])
-            text = home[i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
-        text = process_text(text)
-        messages.insert(END,': ')
-        for i in text:
-            if i in emojis.keys():
-                messages.image_create(END, image = emojis[i])
+            color = "#000080"
+            user = home[channel][i]["u"]
+            text = home[channel][i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
+        messages.insert(END,user,"u_"+str(i))
+        if "edited_at" in home[channel][i]:
+            messages.insert(END," (edited)")
+        messages.insert(END,": ")
+        messages.tag_configure("u_"+str(i),foreground=color,font=("Helvetica",12))
+        messages.tag_bind("u_"+str(i),"<Button-1>", lambda event, u=user: 
+                            view_user(u))
+        text = process_text(text.removesuffix("@"))
+        for t in text:
+            if t in emojis.keys():
+                messages.image_create(END, image = emojis[t])
             else:
-                messages.insert(END,i)
+                messages.insert(END,t,("p_"+home[channel][i]["_id"]))
+        if home[channel][i]["u"] == user:
+            messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
+                              lambda event, t=home[channel][i]: edit_gui(t))
+        else:
+            messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
+                              lambda event, t=f'@{home[channel][i]["u"]} [{home[channel][i]["_id"]}]': entry.insert(0,t))
+        for a in home[channel][i]["attachments"]:
+            if a["mime"] in ("image/png","image/pgm","image/ppm","image/gif") and a["size"] < 2500000:
+                try:
+                    if not a["id"] in imagecache.keys():
+                        imagecache[a["id"]] = PhotoImage(file=os.path.realpath("assets/cache/") + a["filename"] if exists(os.path.realpath("assets/cache/") + a["filename"]) else load_image(a["id"],a["filename"]))
+                        print(imagecache[a["id"]].width())
+                        if imagecache[a["id"]].width() > 480:
+                            imagecache[a["id"]] = imagecache[a["id"]].subsample(int(a["width"]/480)+1)
+                            print(imagecache[a["id"]].width())
+                    messages.insert(END,"\n")
+                    messages.image_create(END, name=a["id"], image=imagecache[a["id"]])
+                    messages.insert(END,"\n")
+                except KeyError:
+                    pass
+                except TclError:
+                    pass
+            
         messages.insert(END,"\n")
     
     messages.yview(END)
@@ -364,83 +554,158 @@ def refresh_users():
     global pfpcache
     for i in userlist.get_children():
         userlist.delete(i)
+    
     for u in ws_data["ulist"].split(";"):
         if u != "":
-            if not u in usrcache:
-                print(u)
-                usrcache[u] = readhttp(f"users/{u}")
-            if u in pfps:
-                userlist.insert("",END,text=" "+u,image=pfps[u])
-            elif str(usrcache[u]['pfp_data']) in pfps:
-                userlist.insert("",END,text=" "+u,image=pfps[str(usrcache[u]['pfp_data'])])
+            if cfg["settings"]["avatars"]:
+                if u in pfps:
+                    userlist.insert("",END,text=" "+u,image=pfps[u])
+                else:
+                    if not u in usrcache:
+                        usrcache[u] = readhttp(f"users/{u}")
+                    if str(usrcache[u]['pfp_data']) in pfps:
+                        userlist.insert("",END,text=" "+u,image=pfps[str(usrcache[u]['pfp_data'])])
+                    else:
+                        userlist.insert("",END,text=" "+u)
             else:
                 userlist.insert("",END,text=" "+u)
-            
             window.update()
+        
 
 def refresh_view():
     global cfg
     for i in (channels,messages,userlist):
         i.place_forget()
     if not "view" in cfg:
-        cfg["view"] = 1
-        #refresh_conf()
+        cfg["view"] = 7
+        refresh_conf()
     show = bin(cfg["view"]).removeprefix("0b")
-    show = "0" * (2 - len(show)) + show
-    show = [bool(int(show[0])),bool(int(show[1]))]
-    window.geometry(str(472 + sum(show) * 128) + "x360")
-    if show[0]: channels.place(x=0,y=0,width=128,height=360)
-    messages.place(x=128 if show[0] else 0,y=0,height=320,width=472)
-    if show[1]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=360)
-    userlabel.place(x=130 if show[0] else 2,y=340,anchor="w")
-    entry.place(x=390  if show[0] else 262,y=340,width=360,anchor="center")
+    show = "0" * (3 - len(show)) + show
+    show = [show]
+    for i in show[0]:
+        show.append(bool(int(i)))
+    del show[0]
+    window.geometry(str(472 + (show[0] + show[2]) * 128) + ("x360" if show[1] else "x320"))
+    messages.place(x=128 if show[0] else 0,y=0,height=320,width=460)
+    scrollbar.place(x=588 if show[0] else 460,y=0,height=360 if show[1] else 320,width=12)
+    if show[0]: channels.place(x=0,y=0,width=128,height=360 if show[1] else 320)
+    if show[1]: entry.place(x=148 if show[0] else 20,y=340,width=420,anchor="w")
+    if show[2]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=360)
 
 def toggle_view(index):
     show = bin(cfg["view"]).removeprefix("0b")
-    show = "0" * (2 - len(show)) + show
-    show = [bool(int(show[0])),bool(int(show[1]))]
+    show = "0" * (3 - len(show)) + show
+    show = [show]
+    for i in show[0]:
+        show.append(bool(int(i)))
+    del show[0]
     show[index] = not show[index]
-    cfg["view"] = int(f"{int(show[0])}{int(show[1])}",2)
+    for i in range(0,len(show)):
+        show[i] = str(int(show[i]))
+    cfg["view"] = int("".join(show),2)
     refresh_conf()
     refresh_view()    
+
+channel = "home"
+channellist={}
+def change_channel(event):
+    global channel
+    if channels.selection_get() != "Home":
+        channel_id = channellist[channels.selection_get()]
+        print(channel_id)
+        channel = "posts/" + channel_id
+    else:
+        channel = "home"
+        print("home")
+    insert_home()
     
-print("setting up widgets...",end="")
+def index_by_id(id):
+    for m in range(0,len(home[channel])):
+        if home[channel][m]["_id"] == id:
+            return m
+    raise ValueError("id not found")
+
+def view_user(name):
+    try:
+        if type(name) == str:
+            accountinfo = readhttp("users/"+name)
+        elif type(name.widget) == ttk.Treeview:
+            accountinfo = readhttp("users/"+userlist.item(userlist.focus())["text"].removeprefix(" "))
+
+        lastseen = time.gmtime(accountinfo["last_seen"])
+
+        userwin = Toplevel()
+        userwin.title("Meower95 - "+accountinfo["_id"])
+        userwin.geometry("240x180")
+        if exists(f'assets/pfps/{accountinfo["pfp_data"]}.png') or exists(f'assets/pfps/{accountinfo["_id"]}.png'):
+            avatar = PhotoImage(file=os.path.realpath(f'assets/pfps/{accountinfo["_id"]}.png' if exists(f'assets/pfps/{accountinfo["_id"]}.png') else f'assets/pfps/{accountinfo["pfp_data"]}.png'))
+            Label(userwin,image=avatar).place(x=8,y=8)
+
+        userlabel = Label(userwin,text=accountinfo["_id"],font=("Helvetica",14))
+        userlabel.place(x=28,y=16,anchor="w")
+
+        quote = Label(userwin,text=accountinfo["quote"],wraplength=100,justify=LEFT,font=("Helvetica",8))
+        quote.place(x=8,y=32,width=100,height=120)
+
+        ttk.Separator(userwin,orient="vertical").place(x=120,y=32,height=120,anchor="n")
+
+        chatswith = Listbox(userwin,font=("Helvetica",10))
+        chatswith.place(x=128,y=32,width=105,height=120)
+        
+        onlinep = PhotoImage(file = os.path.realpath("assets/online.png" if accountinfo["_id"] in ws_data["ulist"].split(";") else "assets/offline.png"))
+        onlinei = Label(userwin,image=onlinep).place(x=8,y=164)
+
+        offline_text = "Last seen on " + str(lastseen[2]) + (('st','nd')[lastseen[2]-1] if lastseen[2] < 2 else 'th') + " of " + ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')[lastseen[1]-1] + " " + str(lastseen[0]) + " " + str(lastseen[3]) + ":" + str(lastseen[4])
+        online = Label(userwin,text="Online" if accountinfo["_id"] in ws_data["ulist"].split(";") else offline_text,font=("Helvetica",8))
+        online.place(x=20,y=160)
+        
+        for chat in readhttp("chats")["autoget"]:
+            if not chat["type"] and accountinfo["_id"] in chat["members"]:
+                chatswith.insert(END,chat["nickname"])
+
+        while True:
+            userwin.update()
+            try:
+                if not userwin.winfo_exists(): break
+            except TclError:
+                break
+    except urllib.error.HTTPError:
+        pass
+
+log("setting up widgets...",safe=True)
 
 style = ttk.Style()
 style.configure('.', font=('Helvetica', 8))
 
 menubar = Menu(window,relief=FLAT, font=('Helvetica', 8))
 mainmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
-mainmenu.add_command(label="Switch server...", command=donothing, font=('Helvetica', 8))
-mainmenu.add_command(label="Switch account...", command=donothing, font=('Helvetica', 8))
+mainmenu.add_command(label="Settings", command=settings, font=('Helvetica', 8))
 mainmenu.add_separator()
 mainmenu.add_command(label="Exit", command=window.destroy, font=('Helvetica', 8))
 menubar.add_cascade(label="Meower95", menu=mainmenu)
 
 viewmenu = Menu(menubar, tearoff=0, font=('Helvetica', 8))
 viewmenu.add_command(label="Chat sidebar", command=lambda: toggle_view(0), font=('Helvetica', 8))
-viewmenu.add_command(label="User sidebar", command=lambda: toggle_view(1), font=('Helvetica', 8))
+viewmenu.add_command(label="Chat entry", command=lambda: toggle_view(1), font=('Helvetica', 8))
+viewmenu.add_command(label="User sidebar", command=lambda: toggle_view(2), font=('Helvetica', 8))
 menubar.add_cascade(label="View", menu=viewmenu)
 
 messages = Text(state=DISABLED, font=('Courier', 12),wrap=WORD)
+scrollbar = ttk.Scrollbar(command=messages.yview)
+messages.config(yscrollcommand = scrollbar.set)
 channels = Listbox(font=('Helvetica', 8))
-userlist = ttk.Treeview(padding=0,show='tree')
-userlabel = Label(text=user+":", font=('Helvetica', 8))
+channels.insert(END,"Home")
+userlist = ttk.Treeview(padding=0,show='tree',selectmode='browse')
+userlist.bind("<<TreeviewSelect>>",view_user)
 entry = Entry(relief="ridge",font=('Courier', 12))
 entry.insert(0,"Waiting for authentification...")
 entry.configure(state=DISABLED)
 entry.bind("<Return>",send_msg)
 refresh_view()
-
 window.config(menu=menubar)
 
 ws_data = {}
-print("done!")
-
-print("inserting messages... ",end='')
 insert_home()
-
-print("done!")
 
 try:
     while True:
@@ -451,6 +716,7 @@ try:
             break
         try:
             transfer = open("TRANSFER","r")
+            deleted = 0
             try:
                 result = json.load(transfer)
             except json.decoder.JSONDecodeError:
@@ -458,6 +724,9 @@ try:
                 transfer.close()
                 result = ''
             if result != '':
+                transfer.close()
+                transfer = open("TRANSFER","w")
+                transfer.write("")
                 transfer.close()
                 print("new transfer data:",result)
                 if result ["cmd"] == "statuscode":
@@ -479,14 +748,34 @@ try:
                             log("Auth data received.",safe=True)
                             entry.configure(state=NORMAL)
                             entry.delete(0,END)
-                            if ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "perm_restriction":
+                            if ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "perm_restriction" and ws_data["userdata"]["payload"]["account"]["ban"]["restrictions"] == 31:
                                 entry.insert(0,f'You\'re banned for {ws_data["userdata"]["payload"]["account"]["ban"]["reason"]} :(')
                                 entry.configure(state=DISABLED)
                             else:
                                 entry.configure(state=NORMAL)
-                        elif result["val"]["mode"] in (1,"delete","edit"):
+                            chats = readhttp("chats")["autoget"]
+                            for i in chats:
+                                channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
+                                channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
+                            channels.bind("<<ListboxSelect>>",change_channel)
                             insert_home()
-                            log("New message, updating message list.",safe=True)
+                        elif result["val"]["mode"] == 1:
+                            if result["val"]["post_origin"] == "home":
+                                home["home"].append(result["val"])
+                            else:
+                                home["posts/"+result["val"]["post_origin"]].append(result["val"])
+                            insert_home()
+                        elif result["val"]["mode"] == "update_post":
+                            home[channel][index_by_id(result["val"]["payload"]["_id"])] = result["val"]["payload"]
+                            home[channel][index_by_id(result["val"]["payload"]["_id"])]["edited"] = True
+                            insert_home()
+                        elif result["val"]["mode"] == "delete":
+                            post = readhttp("posts/"+result["val"]["id"])
+                            if cfg["settings"]["msgdel"]:
+                                try:
+                                    del home[post["post_origin"]][index_by_id(result["val"]["id"])]
+                                except ValueError:
+                                    pass
                         elif result["val"]["mode"] == "banned":
                             print(time.time(),result["val"]["payload"]["expires"] > time.time())
                             entry.delete(0,END)
@@ -500,9 +789,6 @@ try:
                     if result["cmd"] == "ulist":
                         refresh_users()
                
-            transfer = open("TRANSFER","w")
-            transfer.write("")
-            transfer.close()
         except FileNotFoundError:
             pass
         window.update()

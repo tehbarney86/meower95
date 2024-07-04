@@ -34,7 +34,7 @@ If any issue is encountered, never send the contents of these files.
 # Setting up
 *(Meower95 is just in development and sometimes unstable, so please if any bugs appear, report them to our issues page)*
 
-Run ~meower95.py~ using your python executable. Make sure you have all modules listed in `requrements.txt`, or just run `pip3 install -i requirements.txt` in your console.
+Run `meower95.py` using your python executable. Make sure you have all modules listed in `requrements.txt`, or just run `pip3 install -i requirements.txt` in your console.
 
 ##Hardware requirements:
 Currently the pure minimum is unkown, yet the least powerful machine specs that can run this program probably bare down to:

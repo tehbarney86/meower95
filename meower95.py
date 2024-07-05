@@ -98,7 +98,6 @@ def next():
             else:
                 return
         except TclError as e:
-            print(e)
             return
     else:
         try:
@@ -106,8 +105,7 @@ def next():
                 server = servers.selection_get()
             else:
                 return
-        except TclError as e:
-            print(e)
+        except TclError:
             welcome_count += 1
             try: welcome.configure(text=welcome_messages[welcome_count])
             except IndexError: intro.destroy()
@@ -121,7 +119,6 @@ def register(username,password):
     req.add_header('Content-Type', 'application/json; charset=utf-8')
     jsondata = json.dumps({"username":username,"password":password}).encode('utf-8')
     req.add_header('Content-Length', len(jsondata))
-    print(urllib.request.urlopen(req, jsondata).read())
     return urllib.request.urlopen(req, jsondata)
 
 def back():
@@ -193,7 +190,6 @@ cf = open("meower95.conf","r")
 try:
     cfg = json.load(cf)
 except json.decoder.JSONDecodeError as error:
-    print(cf.read())
     if empty_conf:
         jsonwin = Tk()
         jsonwin.title("Meower95 - Error")
@@ -275,7 +271,6 @@ proc = sp.Popen([executable,'backend.py'])
 status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
-    print(link,content)
     log("Sending", content, "to", cfg["servers"][server]["http"] + link, safe = True)
     req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': useragent})
     req.add_header('Content-Type', 'application/json; charset=utf-8')
@@ -284,7 +279,6 @@ def sendhttp(link,content):
     jsondata = json.dumps({"content": content,"username":user,"pswd":cfg["servers"][server]["logins"][user]}).encode('utf-8')
     req.add_header('Content-Length', len(jsondata))
     return urllib.request.urlopen(req, jsondata)
-
 
 def readhttp(link):
     log("Reading", cfg["servers"][server]["http"] + link, safe = True)
@@ -311,16 +305,25 @@ def edit_msg(id="",content=""):
     req.add_header('Content-Length', len(jsondata))
     return urllib.request.urlopen(req, jsondata)
 
+def del_msg(id=""):
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "posts?id=" + id, headers={'User-Agent': useragent}, method='DELETE')
+    req.add_header('Username', user)
+    req.add_header('Token', ws_data["userdata"]["payload"]["token"])
+    return urllib.request.urlopen(req)
+
 def send_msg(event):
-    text = entry.get()
-    if cfg["settings"]["base64"]:
-        text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
-    entry.delete(0,END)
-    if cfg["settings"]["discordcorrupt"]:
-        text_id = json.load(sendhttp(channel,"From "+user+" to everyone except users of the Discord Bridge."))["_id"]
-        edit_msg(text_id,text)
-    else:
-        sendhttp(channel,text)
+    global last_message
+    if entry.get() != "":
+        text = entry.get()
+        if cfg["settings"]["base64"]:
+            text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
+        entry.delete(0,END)
+        if cfg["settings"]["discordcorrupt"]:
+            text_json = json.load(sendhttp(channel,"From "+user+" to everyone except users of the Discord Bridge."))["_id"]
+            edit_msg(text_id,text_json["_id"])
+        else:
+            text_json = json.load(sendhttp(channel,text))
+        last_message = text_json
     
 def get_users(user):
     url = urllib.request.urlopen(cfg["servers"][server]["http"] + "users/" + user)
@@ -340,8 +343,6 @@ def settings():
     def setvar(variable,widget):
         cfg["settings"][variable] = widget.instate(['selected'])
         refresh_conf()
-        print(variable)
-        print(cfg["settings"])
     settings = Tk()
     settings.title("Meower95 - Settings")
     settings.geometry("480x320")
@@ -392,43 +393,45 @@ def settings():
         except TclError:
             break
 def edit_gui(post):
-    def finish_editing():
-        text = edittext.get(0.0,END)
-        if cfg["settings"]["base64"]:
-            text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
-        edit_msg(post["_id"],text)
-        winedit.destroy()
-    
-    winedit = Tk()
-    winedit.geometry("480x240")
-    winedit.resizable(0,0)
-    
-    edittext = Text(winedit)
-    edittext.place(x=5,y=5,width=470,height=190)
-    Button(winedit,text="Cancel",command=winedit.destroy).place(x=5,y=235,anchor="sw")
-    Button(winedit,text="Edit!",command=finish_editing).place(x=475,y=235,anchor="se")
-    
-    text = home[post["post_origin"]][index_by_id(post["_id"])]["p"]
-    
-    try:
-        if text[0:3] == "ec[":
-            text = str(base64.b64decode(text.split("]:")[len(text.split("]:"))-1]),"utf8")
-        if text[0:3] == "rr:":
-            text = str(base64.b64decode(text[3:len(text)]),"utf8")
-    except IndexError:
-        pass
-    except UnicodeError:
-        pass
-    except base64.binascii.Error:
-        pass
-    edittext.insert(0.0,text)
-    
-    while True:
-        winedit.update()
+    if type(post) == dict:
+        def finish_editing():
+            text = edittext.get(0.0,END).removesuffix("\n")
+            if cfg["settings"]["base64"]:
+                text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
+            edit_msg(post["_id"],text)
+            winedit.destroy()
+        
+        winedit = Tk()
+        winedit.geometry("480x240")
+        winedit.resizable(0,0)
+        
+        edittext = Text(winedit)
+        edittext.place(x=5,y=5,width=470,height=190)
+        Button(winedit,text="Cancel",command=winedit.destroy).place(x=5,y=235,anchor="sw")
+        Button(winedit,text="Edit!",command=finish_editing).place(x=475,y=235,anchor="se")
+        
+        chan = channel_by_id(post["_id"])
+        text = home[chan][index_by_id(post["_id"],chan)]["p"]
+        
         try:
-            if not winedit.winfo_exists(): break
-        except TclError:
-            break
+            if text[0:3] == "ec[":
+                text = str(base64.b64decode(text.split("]:")[len(text.split("]:"))-1]),"utf8")
+            if text[0:3] == "rr:":
+                text = str(base64.b64decode(text[3:len(text)-1]),"utf8")
+        except IndexError:
+            pass
+        except UnicodeError:
+            pass
+        except base64.binascii.Error:
+            pass
+        edittext.insert(0.0,text)
+        
+        while True:
+            winedit.update()
+            try:
+                if not winedit.winfo_exists(): break
+            except TclError:
+                break
 
 def process_text(text):
     result = []
@@ -452,6 +455,7 @@ def process_text(text):
     return result
 
 home = {}
+last_message = None
 imagecache = {}
 
 def load_image(id,name):
@@ -467,8 +471,7 @@ def load_image(id,name):
     return os.path.realpath("assets/cache/" + name)
 
 def insert_home():
-    global imagecache
-    text = ""    
+    text = ""
     messages.tag_remove(0.0,END)
     messages.configure(state=NORMAL)
     messages.delete(0.0,END)
@@ -498,16 +501,18 @@ def insert_home():
         messages.mark_set(str(i),END)
         if home[channel][i]["u"] in ["Discord"]: #known bridges, maybe add phone support later (if it even works today)
             color = "#800080"
-            user = home[channel][i]["p"].split(": ")[0]
+            username = home[channel][i]["p"].split(": ")[0]
             text = ": ".join(home[channel][i]["p"].split(": ")[1:len(home[channel][i]["p"].split(":"))]).encode('utf-16', 'surrogatepass').decode('utf-16')
         else:
             color = "#000080"
-            user = home[channel][i]["u"]
+            username = home[channel][i]["u"]
             text = home[channel][i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
-        messages.insert(END,user,"u_"+str(i))
-        if "edited_at" in home[channel][i]:
-            messages.insert(END," (edited)")
-        messages.insert(END,": ")
+        messages.insert(END,username,"u_"+str(i))
+        if home[channel][i]["isDeleted"]:
+            messages.insert(END," (deleted)",("p_"+home[channel][i]["_id"],"smallfont"))
+        elif "edited_at" in home[channel][i]:
+            messages.insert(END," (edited)",("p_"+home[channel][i]["_id"],"smallfont"))
+        messages.insert(END,": ",("p_"+home[channel][i]["_id"]))
         messages.tag_configure("u_"+str(i),foreground=color,font=("Helvetica",12))
         messages.tag_bind("u_"+str(i),"<Button-1>", lambda event, u=user: 
                             view_user(u))
@@ -517,21 +522,23 @@ def insert_home():
                 messages.image_create(END, image = emojis[t])
             else:
                 messages.insert(END,t,("p_"+home[channel][i]["_id"]))
-        if home[channel][i]["u"] == user:
+        if username == user:
             messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
                               lambda event, t=home[channel][i]: edit_gui(t))
+            messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-3>",
+                              lambda event, t=home[channel][i]["_id"]: del_msg(t))
         else:
             messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
                               lambda event, t=f'@{home[channel][i]["u"]} [{home[channel][i]["_id"]}]': entry.insert(0,t))
+        if home[channel][i]["isDeleted"]:
+            messages.tag_configure("p_"+home[channel][i]["_id"],foreground="gray")
         for a in home[channel][i]["attachments"]:
             if a["mime"] in ("image/png","image/pgm","image/ppm","image/gif") and a["size"] < 2500000:
                 try:
                     if not a["id"] in imagecache.keys():
                         imagecache[a["id"]] = PhotoImage(file=os.path.realpath("assets/cache/") + a["filename"] if exists(os.path.realpath("assets/cache/") + a["filename"]) else load_image(a["id"],a["filename"]))
-                        print(imagecache[a["id"]].width())
                         if imagecache[a["id"]].width() > 480:
                             imagecache[a["id"]] = imagecache[a["id"]].subsample(int(a["width"]/480)+1)
-                            print(imagecache[a["id"]].width())
                     messages.insert(END,"\n")
                     messages.image_create(END, name=a["id"], image=imagecache[a["id"]])
                     messages.insert(END,"\n")
@@ -543,6 +550,7 @@ def insert_home():
         messages.insert(END,"\n")
     
     messages.yview(END)
+    messages.tag_configure("smallfont",font=("Helvetica",10))
     messages.configure(state=DISABLED)
     
 pfps = {}
@@ -612,17 +620,21 @@ def change_channel(event):
     global channel
     if channels.selection_get() != "Home":
         channel_id = channellist[channels.selection_get()]
-        print(channel_id)
         channel = "posts/" + channel_id
     else:
         channel = "home"
-        print("home")
     insert_home()
     
-def index_by_id(id):
-    for m in range(0,len(home[channel])):
-        if home[channel][m]["_id"] == id:
+def index_by_id(id,chan):
+    for m in range(0,len(home[chan])):
+        if home[chan][m]["_id"] == id:
             return m
+    raise ValueError("id not found")
+def channel_by_id(id):
+    for c in home.keys():
+        for m in home[c]:
+            if m["_id"] == id:
+                return c
     raise ValueError("id not found")
 
 def view_user(name):
@@ -701,6 +713,7 @@ entry = Entry(relief="ridge",font=('Courier', 12))
 entry.insert(0,"Waiting for authentification...")
 entry.configure(state=DISABLED)
 entry.bind("<Return>",send_msg)
+entry.bind("<Up>",lambda event: edit_gui(last_message))
 refresh_view()
 window.config(menu=menubar)
 
@@ -766,24 +779,27 @@ try:
                                 home["posts/"+result["val"]["post_origin"]].append(result["val"])
                             insert_home()
                         elif result["val"]["mode"] == "update_post":
-                            home[channel][index_by_id(result["val"]["payload"]["_id"])] = result["val"]["payload"]
-                            home[channel][index_by_id(result["val"]["payload"]["_id"])]["edited"] = True
+                            chan = channel_by_id(result["val"]["payload"]["_id"])
+                            home[chan][index_by_id(result["val"]["payload"]["_id"],chan)] = result["val"]["payload"]
+                            home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
                             insert_home()
                         elif result["val"]["mode"] == "delete":
-                            post = readhttp("posts/"+result["val"]["id"])
+                            chan = channel_by_id(result["val"]["id"])
                             if cfg["settings"]["msgdel"]:
+                                home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
+                            else:
                                 try:
-                                    del home[post["post_origin"]][index_by_id(result["val"]["id"])]
+                                    del home[chan][index_by_id(result["val"]["id"],chan)]
                                 except ValueError:
                                     pass
+                            insert_home()
                         elif result["val"]["mode"] == "banned":
-                            print(time.time(),result["val"]["payload"]["expires"] > time.time())
                             entry.delete(0,END)
                             entry.configure(state=NORMAL)
                             if result["val"]["payload"]["state"] == "temp_ban" and result["val"]["payload"]["expires"] > time.time() or result["val"]["payload"]["state"] == "perm_ban":
                                 entry.insert(END,f'You\'re banned for {result["val"]["payload"]["reason"]} :(')
                                 entry.configure(state=DISABLED)
-                        log(f'Unknown direct websocket data. still running doe ;3',safe=True)
+                        log('Unrecognized direct websocket data.',safe=True)
                 else:
                     ws_data[result["cmd"]] = result["val"]
                     if result["cmd"] == "ulist":

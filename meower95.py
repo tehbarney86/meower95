@@ -288,13 +288,10 @@ def readhttp(link):
         req.add_header('Token', ws_data["userdata"]["payload"]["token"])
     except KeyError:
         pass
-    try:
-        url = urllib.request.urlopen(req)
-        data = json.load(url)
-        
-        return data
-    except urllib.error.URLError as e:
-        return {}
+    url = urllib.request.urlopen(req)
+    data = json.load(url)
+    
+    return data
 
 def edit_msg(id="",content=""):
     req = urllib.request.Request(cfg["servers"][server]["http"] + "posts?id=" + id, headers={'User-Agent': useragent}, method='PATCH')
@@ -319,7 +316,7 @@ def send_msg(event):
             text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
         entry.delete(0,END)
         if cfg["settings"]["discordcorrupt"]:
-            text_json = json.load(sendhttp(channel,"From "+user+" to everyone except users of the Discord Bridge."))["_id"]
+            text_json = json.load(sendhttp(channel,"From "+user+" to everyone except users of the Discord Bridge.\nhttps://github.com/tehbarney86/meower95/"))["_id"]
             edit_msg(text_id,text_json["_id"])
         else:
             text_json = json.load(sendhttp(channel,text))
@@ -478,7 +475,7 @@ def insert_home():
     if channel not in home:
         try:
             home[channel] = readhttp(channel + "?autoget=1")["autoget"]
-        except KeyError as e:
+        except urllib.error.URLError:
             messages.insert(END,"Cannot connect to the server, try again later.\n\n",("nonet"))
             messages.tag_configure("nonet",foreground="gray")
             messages.image_create(END, image = emojis["X("])
@@ -507,21 +504,31 @@ def insert_home():
             color = "#000080"
             username = home[channel][i]["u"]
             text = home[channel][i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
-        messages.insert(END,username,"u_"+str(i))
+        messages.insert(END,username,"u_"+home[channel][i]["u"])
         if home[channel][i]["isDeleted"]:
             messages.insert(END," (deleted)",("p_"+home[channel][i]["_id"],"smallfont"))
         elif "edited_at" in home[channel][i]:
             messages.insert(END," (edited)",("p_"+home[channel][i]["_id"],"smallfont"))
         messages.insert(END,": ",("p_"+home[channel][i]["_id"]))
-        messages.tag_configure("u_"+str(i),foreground=color,font=("Helvetica",12))
-        messages.tag_bind("u_"+str(i),"<Button-1>", lambda event, u=user: 
+        messages.tag_configure("u_"+home[channel][i]["u"],foreground=color,font=("Helvetica",12))
+        messages.tag_bind("u_"+home[channel][i]["u"],"<Button-1>", lambda event, u=user: 
                             view_user(u))
         text = process_text(text.removesuffix("@"))
         for t in text:
             if t in emojis.keys():
                 messages.image_create(END, image = emojis[t])
             else:
-                messages.insert(END,t,("p_"+home[channel][i]["_id"]))
+                for w in t.split(" "):
+                    if w != "":
+                        if w[0] == "@":
+                            messages.insert(END,w,("u_"+w.removeprefix("@")))
+                            messages.tag_configure("u_"+w.removeprefix("@"),
+                                                   foreground="#000080",font=("Helvetica",12))
+                            messages.tag_bind("u_"+w.removeprefix("@"),"<Button-1>",
+                                              lambda event, u=w.removeprefix("@"): view_user(u))
+                        else:
+                            messages.insert(END,w,("p_"+home[channel][i]["_id"]))
+                        messages.insert(END," ",("p_"+home[channel][i]["_id"]))
         if username == user:
             messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
                               lambda event, t=home[channel][i]: edit_gui(t))
@@ -637,18 +644,27 @@ def channel_by_id(id):
                 return c
     raise ValueError("id not found")
 
+def timestring(timestamp):
+    return str(timestamp[2]) + (('st','nd')[timestamp[2]-1] if timestamp[2] < 2 else 'th') + " of " + ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')[timestamp[1]-1] + " " + str(timestamp[0]) + " " + str(timestamp[3]) + ":" + str(timestamp[4])
+
 def view_user(name):
     try:
         if type(name) == str:
             accountinfo = readhttp("users/"+name)
         elif type(name.widget) == ttk.Treeview:
             accountinfo = readhttp("users/"+userlist.item(userlist.focus())["text"].removeprefix(" "))
-
-        lastseen = time.gmtime(accountinfo["last_seen"])
+        print(accountinfo)
+        
+        try:
+            lastseen = time.gmtime(accountinfo["last_seen"])
+        except Exception as e:
+            print(e)
+            lastseen = 0
 
         userwin = Toplevel()
         userwin.title("Meower95 - "+accountinfo["_id"])
         userwin.geometry("240x180")
+        userwin.resizable(0,0)
         if exists(f'assets/pfps/{accountinfo["pfp_data"]}.png') or exists(f'assets/pfps/{accountinfo["_id"]}.png'):
             avatar = PhotoImage(file=os.path.realpath(f'assets/pfps/{accountinfo["_id"]}.png' if exists(f'assets/pfps/{accountinfo["_id"]}.png') else f'assets/pfps/{accountinfo["pfp_data"]}.png'))
             Label(userwin,image=avatar).place(x=8,y=8)
@@ -656,7 +672,7 @@ def view_user(name):
         userlabel = Label(userwin,text=accountinfo["_id"],font=("Helvetica",14))
         userlabel.place(x=28,y=16,anchor="w")
 
-        quote = Label(userwin,text=accountinfo["quote"],wraplength=100,justify=LEFT,font=("Helvetica",8))
+        quote = Label(userwin,text=accountinfo["quote"] if accountinfo["quote"] else "No quote",wraplength=100,justify=LEFT,font=("Helvetica",8))
         quote.place(x=8,y=32,width=100,height=120)
 
         ttk.Separator(userwin,orient="vertical").place(x=120,y=32,height=120,anchor="n")
@@ -665,11 +681,15 @@ def view_user(name):
         chatswith.place(x=128,y=32,width=105,height=120)
         
         onlinep = PhotoImage(file = os.path.realpath("assets/online.png" if accountinfo["_id"] in ws_data["ulist"].split(";") else "assets/offline.png"))
-        onlinei = Label(userwin,image=onlinep).place(x=8,y=164)
+        onlinei = Label(userwin,image=onlinep).place(x=8,y=166,anchor="w")
 
-        offline_text = "Last seen on " + str(lastseen[2]) + (('st','nd')[lastseen[2]-1] if lastseen[2] < 2 else 'th') + " of " + ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')[lastseen[1]-1] + " " + str(lastseen[0]) + " " + str(lastseen[3]) + ":" + str(lastseen[4])
-        online = Label(userwin,text="Online" if accountinfo["_id"] in ws_data["ulist"].split(";") else offline_text,font=("Helvetica",8))
-        online.place(x=20,y=160)
+        online = Label(userwin,text="Online" if accountinfo["_id"] in ws_data["ulist"].split(";") else "Last seen on " + timestring(lastseen),font=("Helvetica",8))
+        online.place(x=20,y=166,anchor="w")
+        
+        p_addtochat = PhotoImage(file = os.path.realpath("assets/addtochat.png"))
+        p_dm = PhotoImage(file = os.path.realpath("assets/dm.png"))
+        Button(userwin,image=p_addtochat).place(x=213,y=166,width=20,height=20,anchor="e")
+        Button(userwin,image=p_dm).place(x=233,y=166,width=20,height=20,anchor="e")
         
         for chat in readhttp("chats")["autoget"]:
             if not chat["type"] and accountinfo["_id"] in chat["members"]:

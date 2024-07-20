@@ -315,7 +315,7 @@ def send_msg(event):
         text = entry.get()
         if cfg["settings"]["base64"]:
             text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
-        entry.delete(0,END)
+            entry.delete(0,END)
         else:
             text_json = json.load(sendhttp(channel,text))
         last_message = text_json

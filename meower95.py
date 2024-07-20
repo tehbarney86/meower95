@@ -255,7 +255,7 @@ except TclError:
 
 if not server or not user: exit()
 if not "settings" in cfg:
-    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"discordcorrupt":False,"base64":False}
+    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"base64":False}
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
@@ -316,8 +316,7 @@ def send_msg(event):
         if cfg["settings"]["base64"]:
             text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
             entry.delete(0,END)
-        else:
-            text_json = json.load(sendhttp(channel,text))
+        text_json = json.load(sendhttp(channel,text))
         last_message = text_json
     
 def get_users(user):
@@ -372,7 +371,7 @@ def settings():
     msgdel.place(x=30,y=20)
     base64 = ttk.Checkbutton(hacks,text="Base64 encryption")
     base64.configure(command=lambda: setvar("base64",base64))
-    base64.place(x=30,y=80)
+    base64.place(x=30,y=50)
     
     for i in cfg["settings"].keys():
         eval(i).state(['!alternate'])

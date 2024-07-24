@@ -21,7 +21,6 @@ Meower95 is written with pure Python, so it cannot be blacklisted - Python's url
 
 In return this blocks any servers from banning this client, which allows it to use any hacks included in the program without any hassle, like
 * Not removing deleted messages from channels;
-* Autoeditng messages so to not appear in "webhook-like" bridges like the Discord Bridge;
 * Encoding your messages into Base64 so only clients that support it can see it.;
 > **WARNING - it is not our responsibility if you get banned for using such features. Using them you take a high risk of getting banned from any server if the moderation deems it as harmful or violating a ToS.**
 > Using Meower95's hack features is fully compatible with Meower's Terms of Service and don't use any prohibitied actions.

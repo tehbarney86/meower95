@@ -1,4 +1,4 @@
-import urllib.request, json, os, time, random, base64
+import urllib.request, json, os, time, random, base64, pyglet
 from tkinter import *
 from tkinter import ttk
 from os.path import exists
@@ -35,7 +35,6 @@ Thank you!
         lf.close()
 
 def refresh_conf():
-    global cfg,cf
     cf = open("meower95.conf","w")
     json.dump(cfg,cf)
     cf.close()
@@ -89,7 +88,7 @@ def refresh_intro():
             
         welcome.place(x=130,y=5)
         servers.place(x=130,y=30,width=310,height=135)
-    
+
 def next():
     global welcome_count,server,user,intro_part
     if intro_part: #replace with case, no documentation offline yk
@@ -268,8 +267,8 @@ window.title("Meower95")
 logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 window.wm_iconphoto(False, logo)
 
+print("a")
 proc = sp.Popen([executable,'backend.py'])
-status = sp.Popen.poll(proc)
 
 def sendhttp(link,content):
     log("Sending", content, "to", cfg["servers"][server]["http"] + link, safe = True)
@@ -280,6 +279,20 @@ def sendhttp(link,content):
     jsondata = json.dumps({"content": content,"username":user,"pswd":cfg["servers"][server]["logins"][user]}).encode('utf-8')
     req.add_header('Content-Length', len(jsondata))
     return urllib.request.urlopen(req, jsondata)
+
+def react(id,emoji):
+    log("Reacting with", emoji, "to", id, safe = True)
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "/posts/" + id + "/reactions/" + urllib.parse.quote(emoji), headers={'User-Agent': useragent}, method='POST')
+    req.add_header('Username', user)
+    req.add_header('Token', ws_data["userdata"]["payload"]["token"])
+    return urllib.request.urlopen(req)
+
+def report(id,reason,comment):
+    log("Reacting with", emoji, "to", id, safe = True)
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "/posts/" + id + "/reactions/" + urllib.parse.quote(emoji), headers={'User-Agent': useragent}, method='POST')
+    req.add_header('Username', user)
+    req.add_header('Token', ws_data["userdata"]["payload"]["token"])
+    return urllib.request.urlopen(req)
 
 def readhttp(link):
     log("Reading", cfg["servers"][server]["http"] + link, safe = True)
@@ -315,7 +328,7 @@ def send_msg(event):
         text = entry.get()
         if cfg["settings"]["base64"]:
             text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
-            entry.delete(0,END)
+        entry.delete(0,END)
         text_json = json.load(sendhttp(channel,text))
         last_message = text_json
     
@@ -439,7 +452,7 @@ def process_text(text):
     for i in range(0,len(words)):
         result.append(words[i][1])
         try:
-            result.append(text[words[i][0]+len(words[i][1]):words[i+1][0]])
+            result.append(text[words[i][0]+len(words[i][1]):words[i][0]])
         except IndexError:
             pass
     result.append(text[words[i][0]+len(words[i][1]):len(text)])
@@ -564,21 +577,21 @@ def refresh_users():
     for i in userlist.get_children():
         userlist.delete(i)
     
-    for u in ws_data["ulist"].split(";"):
-        if u != "":
-            if cfg["settings"]["avatars"]:
-                if u in pfps:
-                    userlist.insert("",END,text=" "+u,image=pfps[u])
-                else:
-                    if not u in usrcache:
-                        usrcache[u] = readhttp(f"users/{u}")
-                    if str(usrcache[u]['pfp_data']) in pfps:
-                        userlist.insert("",END,text=" "+u,image=pfps[str(usrcache[u]['pfp_data'])])
-                    else:
-                        userlist.insert("",END,text=" "+u)
+    ulist_api = readhttp("ulist")["autoget"]
+    print(ulist_api)
+    
+    for u in ulist_api:
+        if cfg["settings"]["avatars"]:
+            if u["_id"] in pfps:
+                userlist.insert("",END,text=" "+u["_id"],image=pfps[u["_id"]])
             else:
-                userlist.insert("",END,text=" "+u)
-            window.update()
+                if str(u['pfp_data']) in pfps:
+                    userlist.insert("",END,text=" "+u["_id"],image=pfps[str(u['pfp_data'])])
+                else:
+                    userlist.insert("",END,text=" "+u["_id"])
+        else:
+            userlist.insert("",END,text=" "+u["_id"])
+        window.update()
         
 
 def refresh_view():
@@ -723,7 +736,7 @@ channels = Listbox(font=('Helvetica', 8))
 channels.insert(END,"Home")
 userlist = ttk.Treeview(padding=0,show='tree',selectmode='browse')
 userlist.bind("<<TreeviewSelect>>",view_user)
-entry = Entry(relief="ridge",font=('Courier', 12))
+entry = ttk.Entry()
 entry.insert(0,"Waiting for authentification...")
 entry.configure(state=DISABLED)
 entry.bind("<Return>",send_msg)
@@ -782,8 +795,8 @@ try:
                                 entry.configure(state=NORMAL)
                             chats = readhttp("chats")["autoget"]
                             for i in chats:
-                                channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
-                                channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
+                                channels.insert(END, i["members"][1] if i["type"] else i["nickname"])
+                                channellist[i["members"][1] if i["type"] else i["nickname"]] = i["_id"]
                             channels.bind("<<ListboxSelect>>",change_channel)
                             insert_home()
                         elif result["val"]["mode"] == 1:
@@ -791,6 +804,9 @@ try:
                                 home["home"].append(result["val"])
                             else:
                                 home["posts/"+result["val"]["post_origin"]].append(result["val"])
+                            player = pyglet.media.Player()
+                            player.queue(pyglet.media.StaticSource(pyglet.media.load(os.path.realpath("assets/message.wav")))) 
+                            player.play()
                             insert_home()
                         elif result["val"]["mode"] == "update_post":
                             chan = channel_by_id(result["val"]["payload"]["_id"])

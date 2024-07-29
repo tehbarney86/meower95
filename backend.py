@@ -1,19 +1,16 @@
-from websockets.exceptions import ConnectionClosedError
-from websockets.sync.client import connect
+import websocket
 from os.path import exists
 import json
 
 def writefile():
     global websocket
     try:
-        transfer = open("TRANSFER","w")
         recv = irun(lambda: websocket.recv())
+        transfer = open("TRANSFER","w")
         transfer.write(recv)
         transfer.close()
-    except ConnectionClosedError:
-        websocket.close()
-        websocket = irun(lambda: connect(cfg["servers"][server]["http"]))
-        irun(lambda: websocket.send('{"cmd": "direct", "val": {"username": "' + user + '", "pswd": "' + cfg["servers"][server]["logins"][user] + '"}}'))
+    except Exception as e:
+        print(e)
 def irun(com):
     while True:
         try:
@@ -28,7 +25,8 @@ def irun(com):
 cf = open("meower95.conf","r")
 cfg = json.load(cf)
 cf.close()
-websocket = irun(lambda: connect(cfg["servers"][cfg["lastsession"]["server"]]["websocket"]))
+websocket = websocket.WebSocket()
+irun(lambda: websocket.connect(cfg["servers"][cfg["lastsession"]["server"]]["websocket"]))
 irun(lambda: websocket.send('{"cmd": "direct", "val": {"cmd": "authpswd", "val": {"username": "' + cfg["lastsession"]["user"] + '", "pswd": "' + cfg["servers"][cfg["lastsession"]["server"]]["logins"][cfg["lastsession"]["user"]] + '"}}}'))
 while True:
     try:

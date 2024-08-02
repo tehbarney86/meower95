@@ -254,7 +254,7 @@ except TclError:
 
 if not server or not user: exit()
 if not "settings" in cfg:
-    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"base64":False}
+    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True}
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
@@ -270,13 +270,13 @@ window.wm_iconphoto(False, logo)
 print("a")
 proc = sp.Popen([executable,'backend.py'])
 
-def sendhttp(link,content):
-    log("Sending", content, "to", cfg["servers"][server]["http"] + link, safe = True)
+def sendhttp(link, content):
+    log("Sending", str(content), "to", cfg["servers"][server]["http"] + link)
     req = urllib.request.Request(cfg["servers"][server]["http"] + link, headers={'User-Agent': useragent})
     req.add_header('Content-Type', 'application/json; charset=utf-8')
     req.add_header('Username', user)
     req.add_header('Token', ws_data["userdata"]["payload"]["token"])
-    jsondata = json.dumps({"content": content,"username":user,"pswd":cfg["servers"][server]["logins"][user]}).encode('utf-8')
+    jsondata = json.dumps(content).encode('utf-8')
     req.add_header('Content-Length', len(jsondata))
     return urllib.request.urlopen(req, jsondata)
 
@@ -326,10 +326,8 @@ def send_msg(event):
     global last_message
     if entry.get() != "":
         text = entry.get()
-        if cfg["settings"]["base64"]:
-            text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
         entry.delete(0,END)
-        text_json = json.load(sendhttp(channel,text))
+        text_json = json.load(sendhttp(channel,{"content": text,"username":user,"pswd":cfg["servers"][server]["logins"][user]}))
         last_message = text_json
     
 def get_users(user):
@@ -363,11 +361,9 @@ def settings():
 
     misc = Frame(notebook)
     sounds = Frame(notebook)
-    hacks = Frame(notebook)
 
     notebook.add(misc,text="Misc.")
-    #notebook.add(sounds,text="Sound") cant test it on my netbook :(
-    notebook.add(hacks,text="Hacks")
+    notebook.add(sounds,text="Sound")
     # Misc
     emoji = ttk.Checkbutton(misc,text="Convert text emojis into pictures")
     emoji.configure(command=lambda: setvar("emoji",emoji))
@@ -378,13 +374,6 @@ def settings():
     avatars = ttk.Checkbutton(misc,text="Load avatars")
     avatars.configure(command=lambda: setvar("avatars",avatars))
     avatars.place(x=30,y=80)
-    
-    msgdel = ttk.Checkbutton(hacks,text="Don't hide messages on deletion")
-    msgdel.configure(command=lambda: setvar("msgdel",msgdel))
-    msgdel.place(x=30,y=20)
-    base64 = ttk.Checkbutton(hacks,text="Base64 encryption")
-    base64.configure(command=lambda: setvar("base64",base64))
-    base64.place(x=30,y=50)
     
     for i in cfg["settings"].keys():
         eval(i).state(['!alternate'])
@@ -400,8 +389,6 @@ def edit_gui(post):
     if type(post) == dict:
         def finish_editing():
             text = edittext.get(0.0,END).removesuffix("\n")
-            if cfg["settings"]["base64"]:
-                text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
             edit_msg(post["_id"],text)
             winedit.destroy()
         
@@ -466,13 +453,15 @@ def load_image(id,name):
     if not exists(os.path.realpath("assets/cache/" + name)):
         url = urllib.request.Request("https://uploads.meower.org/attachments/"+id+"/"+name, headers={'User-Agent': 'Meower95',"Username":user})
         url.add_header('Token', ws_data["userdata"]["payload"]["token"])
-
-        img = urllib.request.urlopen(url)
-        
-        image = open(os.path.realpath("assets/cache/" + name),"wb")
-        image.write(img.read())
-        image.close()
-    return os.path.realpath("assets/cache/" + name)
+        try:
+            img = urllib.request.urlopen(url)
+        except urllib.error.HTTPError:
+            return os.path.realpath("assets/warning.png")
+        else:
+            image = open(os.path.realpath("assets/cache/" + name),"wb")
+            image.write(img.read())
+            image.close()
+            return os.path.realpath("assets/cache/" + name)
 
 def insert_home():
     text = ""
@@ -548,9 +537,11 @@ def insert_home():
             messages.tag_configure("p_"+home[channel][i]["_id"],foreground="gray")
         for a in home[channel][i]["attachments"]:
             if a["mime"] in ("image/png","image/pgm","image/ppm","image/gif") and a["size"] < 2500000:
+                filename = os.path.realpath("assets/cache/") + a["id"] + os.path.splitext(a["filename"])[1]
                 try:
                     if not a["id"] in imagecache.keys():
-                        imagecache[a["id"]] = PhotoImage(file=os.path.realpath("assets/cache/") + a["filename"] if exists(os.path.realpath("assets/cache/") + a["filename"]) else load_image(a["id"],a["filename"]))
+                        print(a["id"])
+                        imagecache[a["id"]] = PhotoImage(file=filename if exists(filename) else load_image(a["id"],a["filename"]))
                         if imagecache[a["id"]].width() > 480:
                             imagecache[a["id"]] = imagecache[a["id"]].subsample(int(a["width"]/480)+1)
                     messages.insert(END,"\n")
@@ -570,8 +561,8 @@ def insert_home():
 pfps = {}
 for p in os.listdir("assets/pfps/"):
     pfps[os.path.splitext(p)[0]] = PhotoImage(file=os.path.realpath(f'assets/pfps/{p}'))
-usrcache = {}
-
+usrsound = {}
+last_sound_user = 0
 def refresh_users():
     global pfpcache
     for i in userlist.get_children():
@@ -607,12 +598,14 @@ def refresh_view():
     for i in show[0]:
         show.append(bool(int(i)))
     del show[0]
-    window.geometry(str(472 + (show[0] + show[2]) * 128) + ("x360" if show[1] else "x320"))
+    height = 720
+    if show[1]: height += 40
+    window.geometry(str(472 + (show[0] + show[2]) * 128) + "x" + str(height))
     messages.place(x=128 if show[0] else 0,y=0,height=320,width=460)
-    scrollbar.place(x=588 if show[0] else 460,y=0,height=360 if show[1] else 320,width=12)
-    if show[0]: channels.place(x=0,y=0,width=128,height=360 if show[1] else 320)
+    scrollbar.place(x=588 if show[0] else 460,y=0,height=height,width=12)
+    if show[0]: channels.place(x=0,y=0,width=128,height=height)
     if show[1]: entry.place(x=148 if show[0] else 20,y=340,width=420,anchor="w")
-    if show[2]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=360)
+    if show[2]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=height)
 
 def toggle_view(index):
     show = bin(cfg["view"]).removeprefix("0b")
@@ -795,8 +788,9 @@ try:
                                 entry.configure(state=NORMAL)
                             chats = readhttp("chats")["autoget"]
                             for i in chats:
-                                channels.insert(END, i["members"][1] if i["type"] else i["nickname"])
-                                channellist[i["members"][1] if i["type"] else i["nickname"]] = i["_id"]
+                                del i["members"][i["members"].index(user)]
+                                channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
+                                channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
                             channels.bind("<<ListboxSelect>>",change_channel)
                             insert_home()
                         elif result["val"]["mode"] == 1:
@@ -804,9 +798,16 @@ try:
                                 home["home"].append(result["val"])
                             else:
                                 home["posts/"+result["val"]["post_origin"]].append(result["val"])
-                            player = pyglet.media.Player()
-                            player.queue(pyglet.media.StaticSource(pyglet.media.load(os.path.realpath("assets/message.wav")))) 
-                            player.play()
+                            if not result["val"]["u"] in usrsound:
+                                if last_sound_user == 12: last_sound_user = 1
+                                else: last_sound_user += 1
+                                usrsound[result["val"]["u"]] = last_sound_user
+                            try:
+                                player = pyglet.media.Player()
+                                player.queue(pyglet.media.StaticSource(pyglet.media.load(os.path.realpath("assets/message" + str(usrsound[result["val"]["u"]]) + ".wav")))) 
+                                player.play()
+                            except Exception as e:
+                                print(e)
                             insert_home()
                         elif result["val"]["mode"] == "update_post":
                             chan = channel_by_id(result["val"]["payload"]["_id"])
@@ -814,14 +815,14 @@ try:
                             home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
                             insert_home()
                         elif result["val"]["mode"] == "delete":
-                            chan = channel_by_id(result["val"]["id"])
-                            if cfg["settings"]["msgdel"]:
-                                home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
-                            else:
-                                try:
-                                    del home[chan][index_by_id(result["val"]["id"],chan)]
-                                except ValueError:
-                                    pass
+                            try:
+                                chan = channel_by_id(result["val"]["id"])
+                            except:
+                                chan = result["val"]["id"]
+                            try:
+                                del home[chan][index_by_id(result["val"]["id"],chan)]
+                            except ValueError:
+                                pass
                             insert_home()
                         elif result["val"]["mode"] == "banned":
                             entry.delete(0,END)

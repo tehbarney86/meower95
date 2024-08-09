@@ -1,13 +1,13 @@
-import urllib.request, json, os, time, random, base64, pyglet
-from tkinter import *
-from tkinter import ttk
-from os.path import exists
-import subprocess as sp
-from sys import executable
+import urllib.request, json, os, time, random, base64, pyglet;
+from tkinter import *;
+from tkinter import ttk;
+from os.path import exists;
+import subprocess as sp;
+from sys import executable;
 
 def log(*args,sep=" ",safe=False):
     if not exists("meower95.log"):
-        lf = open("meower95.log","w")
+        lf = open("meower95.log","w");
         lf.write('''!!! WARNING !!!
 Please do not share this file to anybody you don't know or trust.
 This file can contain valuable information like your Meower
@@ -22,22 +22,22 @@ Thank you!
 
 ;3
 
-''')
-        lf.close()
-    lf = open("meower95.log","a")
-    t = time.gmtime()
-    logput = f"{t[0]}.{t[1]}.{t[2]} {t[3]}:{t[4]}:{t[5]}: " + sep.join(args)
-    lf.write(logput + "\n")
-    lf.close()
+''');
+        lf.close();
+    lf = open("meower95.log","a");
+    t = time.gmtime();
+    logput = f"{t[0]}.{t[1]}.{t[2]} {t[3]}:{t[4]}:{t[5]}: " + sep.join(args);
+    lf.write(logput + "\n");
+    lf.close();
     if safe:
-        lf = open("meower95.safelog","a" if exists("meower95.safelog") else "w")
-        lf.write(logput + "\n")
-        lf.close()
+        lf = open("meower95.safelog","a" if exists("meower95.safelog") else "w");
+        lf.write(logput + "\n");
+        lf.close();
 
 def refresh_conf():
-    cf = open("meower95.conf","w")
-    json.dump(cfg,cf)
-    cf.close()
+    cf = open("meower95.conf","w");
+    json.dump(cfg,cf);
+    cf.close();
 
 welcome_messages = ("Select a server by clicking it's title on the list below:",
                     "Just click a name below to continue.",
@@ -51,96 +51,96 @@ welcome_messages = ("Select a server by clicking it's title on the list below:",
                     "Click, and then click me again.",
                     "No, you do the stuff I said first, then you click.",
                     "Okay, you're just annoying, stop trying to be funny.",
-                    "Next time you click I'll crash the program.")
-welcome_count = -1
-intro_part = 0
-server = user = None
-useragent = ""
+                    "Next time you click I'll crash the program.");
+welcome_count = -1;
+intro_part = 0;
+server = user = None;
+useragent = "";
 for i in range(0,8):
-    useragent += random.choice("qwertyuiopasdfghjklzxcvbnm1234567890")
+    useragent += random.choice("qwertyuiopasdfghjklzxcvbnm1234567890");
 
 def refresh_intro():
-    users.delete(0,END)
-    servers.delete(0,END)
+    users.delete(0,END);
+    servers.delete(0,END);
     for i in (welcome,servers,user_title,users):
-        i.place_forget()
-    welcome.place_forget()
-    bback.configure(state=DISABLED if intro_part == 0 else NORMAL)
-    bnext.configure(text="Chat!" if intro_part else "Next >")
+        i.place_forget();
+    welcome.place_forget();
+    bback.configure(state=DISABLED if intro_part == 0 else NORMAL);
+    bnext.configure(text="Chat!" if intro_part else "Next >");
     if intro_part > 1:
-        intro.destroy()
+        intro.destroy();
     elif intro_part:
         if "logins" in cfg["servers"][server]:
             for i in list(cfg["servers"][server]["logins"].keys()):
-                users.insert(END,i)
+                users.insert(END,i);
         else:
-            cfg["servers"][server]["logins"] = {}
-            refresh_conf()
-        user_title.place(x=130,y=5)
-        users.place(x=130,y=30,width=310,height=135)
+            cfg["servers"][server]["logins"] = {};
+            refresh_conf();
+        user_title.place(x=130,y=5);
+        users.place(x=130,y=30,width=310,height=135);
     else:
         if "servers" in cfg:
             for i in list(cfg["servers"].keys()):
-                servers.insert(END,i)
+                servers.insert(END,i);
         else:
-            cfg["servers"] = {}
-            refresh_conf()
+            cfg["servers"] = {};
+            refresh_conf();
             
-        welcome.place(x=130,y=5)
-        servers.place(x=130,y=30,width=310,height=135)
+        welcome.place(x=130,y=5);
+        servers.place(x=130,y=30,width=310,height=135);
 
 def next():
     global welcome_count,server,user,intro_part
     if intro_part: #replace with case, no documentation offline yk
         try:
             if users.selection_get() in cfg["servers"][server]["logins"].keys():
-                user = users.selection_get()
+                user = users.selection_get();
             else:
-                return
+                return;
         except TclError as e:
-            return
+            return;
     else:
         try:
             if servers.selection_get() in cfg["servers"].keys():
-                server = servers.selection_get()
+                server = servers.selection_get();
             else:
-                return
+                return;
         except TclError:
-            welcome_count += 1
-            try: welcome.configure(text=welcome_messages[welcome_count])
-            except IndexError: intro.destroy()
-            return
+            welcome_count += 1;
+            try: welcome.configure(text=welcome_messages[welcome_count]);
+            except IndexError: intro.destroy();
+            return;
     
-    intro_part += 1
-    refresh_intro()
+    intro_part += 1;
+    refresh_intro();
 
 def register(username,password):
-    req = urllib.request.Request(cfg["servers"][server]["http"] + "auth/register", headers={'User-Agent': useragent})
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    jsondata = json.dumps({"username":username,"password":password}).encode('utf-8')
-    req.add_header('Content-Length', len(jsondata))
-    return urllib.request.urlopen(req, jsondata)
+    req = urllib.request.Request(cfg["servers"][server]["http"] + "auth/register", headers={'User-Agent': useragent});
+    req.add_header('Content-Type', 'application/json; charset=utf-8');
+    jsondata = json.dumps({"username":username,"password":password}).encode('utf-8');
+    req.add_header('Content-Length', len(jsondata));
+    return urllib.request.urlopen(req, jsondata);
 
 def back():
     global intro_part
     if intro_part > 0: intro_part -= 1
-    refresh_intro()
+    refresh_intro();
 
 def add():
     global cfg
     def save_cfg():
         global cfg
-        if intro_part: cfg["servers"][server]["logins"][entry1.get()] = entry2.get()
+        if intro_part: cfg["servers"][server]["logins"][entry1.get()] = entry2.get();
         else:
-            cfg["servers"][entry1.get()] = {}
-            cfg["servers"][entry1.get()]["http"] = entry2.get()
+            cfg["servers"][entry1.get()] = {};
+            cfg["servers"][entry1.get()]["http"] = entry2.get();
             if cfg["servers"][entry1.get()]["http"][len(cfg["servers"][entry1.get()]["http"])] != "/":
-                cfg["servers"][entry1.get()]["http"] += "/"
-            cfg["servers"][entry1.get()]["websocket"] = entry3.get()
-            cfg["servers"][entry1.get()]["logins"] = {}
-        refresh_conf()
-        winadd.destroy()
-        refresh_intro()
+                cfg["servers"][entry1.get()]["http"] += "/";
+            cfg["servers"][entry1.get()]["websocket"] = entry3.get();
+            cfg["servers"][entry1.get()]["logins"] = {};
+        refresh_conf();
+        winadd.destroy();
+        refresh_intro();
         
     winadd = Tk()
     winadd.title("Meower - Add " + ("user account" if intro_part else "server"))

@@ -1,3 +1,8 @@
+# THIS CLIENT HAS BEEN (for the most part) DISCONTINUED!
+Since barney86 is banned from Meower permanently, this repository will likely see very little new updates.
+
+I (delusionsGH) may fork it and develop it further, but that is highly unlikely unless I decide to learn Python.
+
 # Meower95!
 Meower95 is the new lightweight, cute, Windows 95-styled and heckin' hackin' Meower client designed for low-end hardware, with features like:
 * Selecting your own server and account on start up;

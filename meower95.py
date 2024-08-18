@@ -254,7 +254,7 @@ except TclError:
 
 if not server or not user: exit()
 if not "settings" in cfg:
-    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True}
+    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"base64":False}
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
@@ -326,6 +326,8 @@ def send_msg(event):
     global last_message
     if entry.get() != "":
         text = entry.get()
+        if cfg["settings"]["base64"]:
+            text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
         entry.delete(0,END)
         text_json = json.load(sendhttp(channel,{"content": text,"username":user,"pswd":cfg["servers"][server]["logins"][user]}))
         last_message = text_json
@@ -361,9 +363,11 @@ def settings():
 
     misc = Frame(notebook)
     sounds = Frame(notebook)
+    hacks = Frame(notebook)
 
     notebook.add(misc,text="Misc.")
     notebook.add(sounds,text="Sound")
+    notebook.add(hacks,text="Hacks")
     # Misc
     emoji = ttk.Checkbutton(misc,text="Convert text emojis into pictures")
     emoji.configure(command=lambda: setvar("emoji",emoji))
@@ -374,6 +378,12 @@ def settings():
     avatars = ttk.Checkbutton(misc,text="Load avatars")
     avatars.configure(command=lambda: setvar("avatars",avatars))
     avatars.place(x=30,y=80)
+    msgdel = ttk.Checkbutton(hacks,text="Don't hide messages on deletion")
+    msgdel.configure(command=lambda: setvar("msgdel",msgdel))
+    msgdel.place(x=30,y=20)
+    base64 = ttk.Checkbutton(hacks,text="Base64 encryption")
+    base64.configure(command=lambda: setvar("base64",base64))
+    base64.place(x=30,y=50)
     
     for i in cfg["settings"].keys():
         eval(i).state(['!alternate'])
@@ -389,6 +399,8 @@ def edit_gui(post):
     if type(post) == dict:
         def finish_editing():
             text = edittext.get(0.0,END).removesuffix("\n")
+            if cfg["settings"]["base64"]:
+                text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
             edit_msg(post["_id"],text)
             winedit.destroy()
         
@@ -815,14 +827,14 @@ try:
                             home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
                             insert_home()
                         elif result["val"]["mode"] == "delete":
-                            try:
-                                chan = channel_by_id(result["val"]["id"])
-                            except:
-                                chan = result["val"]["id"]
-                            try:
-                                del home[chan][index_by_id(result["val"]["id"],chan)]
-                            except ValueError:
-                                pass
+                            chan = channel_by_id(result["val"]["id"])
+                            if cfg["settings"]["msgdel"]:
+                                home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
+                            else:
+                                try:
+                                    del home[chan][index_by_id(result["val"]["id"],chan)]
+                                except ValueError:
+                                    pass
                             insert_home()
                         elif result["val"]["mode"] == "banned":
                             entry.delete(0,END)

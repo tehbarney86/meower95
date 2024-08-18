@@ -47,10 +47,10 @@ Run `meower95.py` using your Python executable. Make sure you have all modules l
 
 ## Hardware requirements:
 Currently the bare minimum is untested, yet the least powerful machine specs that can run this program probably go down to:
-* Processor - Intel Celeron (tested on an Intel Atom N270);
-* RAM - 512MB, (tested on 2GB);
+* Processor - Intel Celeron (tested on an Intel Atom N270 and Core i5-4440);
+* RAM - 2 Gb (tested on 2 and 4 Gb);
 * Internet Speed - 50 Kb/S
-* Video Resolution - Not enforced, but smaller resolutions like 1280x768 are recommended as the program is designed for low resolution displays (tested on 1024x600);
-* OS - Anything that can run Python 3.xx and modules required by Meower95 as listed in `requirements.txt` (Tested on Xfce4 Debian 12).
+* Video Resolution - Not enforced, but smaller resolutions like 1280x768 are recommended as the program is designed for low resolution displays (tested on 1024x600, 1440x900, 1920x1080, etc.);
+* OS - Anything that can run Python 3.xx and modules required by Meower95 as listed in `requirements.txt` (Tested on Debian 12, Pop!_OS and Windows 10).
 
 ***We hope you enjoy!***

@@ -4,23 +4,24 @@ i have been banned from meower for very silly (and kinda fake) reasons, so, sinc
 feel free to annoy everybody in chat once again, because `ec[Meower95!]aSBmZWx0IGxpa2UgaXQgbG9sIGZ1Y2sgdGhlIHJmYyBM`
 
 # Meower95!
-Meower95 is the new lightweight, cute, Windows 95-styled and heckin' hackin' Meower client designed for low-end hardware, with features like:
+Meower95 is the new lightweight, cute, Windows 95-styled and heckin'-hackin' Meower client designed for low-end hardware, with features like:
 * Selecting your own server and account on start up;
 * Simple IRC-like layout and design;
-* New "hack" features (that will probably also get you banned :P)
+* New "hack" features (that will probably also get you banned with meower's 1984 moderation :P)
 * Locally setting up avatars for other accounts;
+* Silly and cutesy pre-built avatars for regular users;
 * Text emoticons like ":3" converting to normal emojis;
-* Good-old Windows 95 simple look (unless you're on windows 1x).
+* Good-old Windows 95 simple look.
 ## Looks & Feels
-Using the good ol' tkinter python library, Meower95 is lightweight and inspired by the late 90's design language, and we've worked hard to make it look as nice and fair to 90's designs, while still providing modern features.
+Using the good ol' `tkinter` python library, Meower95 is lightweight and inspired by the late 90's design language, and we've worked hard to make it look as nice and fair to 90's designs, while still providing modern features.
 ### Simple design
 Meower95 is simple too - every action is just a few clicks away:
 * Click on someone's message to reply to it, or on your own to edit it;
 * Click on a username or profile on the right sidebar to see their quote and see in what group chats you both are in.
-Since Meower95 is still in development, more simplistic features are coming in the future, like:
-* Right clicking on a user profile or their message opens up a window to report them;
 * Right clicking on your messages allows you to quickly delete them;
 * Pressing the up arrow will allow you to edit your last typed message.
+Since Meower95 is still in development, more simplistic features are coming in the future, like: (TODO)
+* Right clicking on a user profile or their message opens up a window to report them;
 ## Hacks
 Meower95 is written with pure Python, so it cannot be blacklisted - Python's urllib doesn't send any unnecessary information to any servers, except for a random useragent.
 

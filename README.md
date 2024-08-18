@@ -1,5 +1,5 @@
-# this client is very silly ;3
-i have been banned from meower for very silly reasons, so, since im bored, im turning hacks back lol
+# DISCLAIMER: this client is very silly ;3
+i have been banned from meower for very silly (and kinda fake) reasons, so, since im bored, im turning hacks back lol
 
 feel free to annoy everybody in chat once again, because `ec[Meower95!]aSBmZWx0IGxpa2UgaXQgbG9sIGZ1Y2sgdGhlIHJmYyBM`
 

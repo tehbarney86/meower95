@@ -1,2 +1,2 @@
 pyglet
-websocket-client
+websocket-client == 1.2.3 # wow is this a coincidence lmao

@@ -12,6 +12,10 @@ Meower95 is the new lightweight, cute, Windows 95-styled and heckin'-hackin' Meo
 * Silly and cutesy pre-built avatars for regular users;
 * Text emoticons like ":3" converting to normal emojis;
 * Good-old Windows 95 simple look.
+
+![](https://github.com/tehbarney86/meower95/blob/main/assets/screenshots/1.png?raw=true)
+![](https://github.com/tehbarney86/meower95/blob/main/assets/screenshots/2.png?raw=true)
+![](https://github.com/tehbarney86/meower95/blob/main/assets/screenshots/3.png?raw=true)
 ## Looks & Feels
 Using the good ol' `tkinter` python library, Meower95 is lightweight and inspired by the late 90's design language, and we've worked hard to make it look as nice and fair to 90's designs, while still providing modern features.
 ### Simple design

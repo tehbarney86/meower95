@@ -480,16 +480,20 @@ def insert_home():
     messages.tag_remove(0.0,END)
     messages.configure(state=NORMAL)
     messages.delete(0.0,END)
-    if channel not in home:
-        try:
-            home[channel] = readhttp(channel + "?autoget=1")["autoget"]
-        except urllib.error.URLError:
-            messages.insert(END,"Cannot connect to the server, try again later.\n\n",("nonet"))
-            messages.tag_configure("nonet",foreground="gray")
-            messages.image_create(END, image = emojis["X("])
-            return
-            
-        home[channel].reverse()
+    if channel not in home or home[channel] == []:
+        if channel == "livechat":
+            home[channel] = []
+            messages.insert(END,"Livechat is empty, waiting for you... ;3",("nonet"))
+        else:
+            try:
+                home[channel] = readhttp(channel)
+                home[channel].reverse()
+            except urllib.error.URLError as e:
+                home[channel] = []
+                messages.insert(END,f"Cannot connect to {channel}, try again later.\n",("nonet"))
+                messages.insert(END,str(e)+"\n",("nonet"))
+                messages.image_create(END, image = emojis["X("])
+        messages.tag_configure("nonet",foreground="gray")        
     for i in range(0,len(home[channel])):
         try:
             if home[channel][i]["p"][0:3] == "ec[":
@@ -577,11 +581,16 @@ usrsound = {}
 last_sound_user = 0
 def refresh_users():
     global pfpcache
-    for i in userlist.get_children():
-        userlist.delete(i)
-    
-    ulist_api = readhttp("ulist")["autoget"]
-    print(ulist_api)
+    try:
+        ulist_api = readhttp("ulist")["autoget"]
+        for i in userlist.get_children():
+            userlist.delete(i)
+    except urllib.error.HTTPError:
+        for i in userlist.get_children():
+            userlist.delete(i)
+        return
+    except urllib.error.URLError:
+        return
     
     for u in ulist_api:
         if cfg["settings"]["avatars"]:
@@ -610,7 +619,7 @@ def refresh_view():
     for i in show[0]:
         show.append(bool(int(i)))
     del show[0]
-    height = 720
+    height = 320
     if show[1]: height += 40
     window.geometry(str(472 + (show[0] + show[2]) * 128) + "x" + str(height))
     messages.place(x=128 if show[0] else 0,y=0,height=320,width=460)
@@ -637,11 +646,12 @@ channel = "home"
 channellist={}
 def change_channel(event):
     global channel
-    if channels.selection_get() != "Home":
+    if not channels.selection_get() in ("Home","Livechat"):
         channel_id = channellist[channels.selection_get()]
         channel = "posts/" + channel_id
     else:
-        channel = "home"
+        channel = channels.selection_get().lower()
+    print(channel)
     insert_home()
     
 def index_by_id(id,chan):
@@ -739,6 +749,8 @@ scrollbar = ttk.Scrollbar(command=messages.yview)
 messages.config(yscrollcommand = scrollbar.set)
 channels = Listbox(font=('Helvetica', 8))
 channels.insert(END,"Home")
+channels.insert(END,"Livechat")
+channels.bind("<<ListboxSelect>>",change_channel)
 userlist = ttk.Treeview(padding=0,show='tree',selectmode='browse')
 userlist.bind("<<TreeviewSelect>>",view_user)
 entry = ttk.Entry()
@@ -803,12 +815,15 @@ try:
                                 del i["members"][i["members"].index(user)]
                                 channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
                                 channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
-                            channels.bind("<<ListboxSelect>>",change_channel)
                             insert_home()
-                        elif result["val"]["mode"] == 1:
-                            if result["val"]["post_origin"] == "home":
-                                home["home"].append(result["val"])
+                        elif result["val"]["mode"] in (1,2):
+                            if result["val"]["post_origin"] in ("home","livechat"):
+                                if not result["val"]["post_origin"] in home:
+                                    home[result["val"]["post_origin"]] = []
+                                home[result["val"]["post_origin"]].append(result["val"])
                             else:
+                                if not "posts/"+result["val"]["post_origin"] in home:
+                                    home["posts/"+result["val"]["post_origin"]] = []
                                 home["posts/"+result["val"]["post_origin"]].append(result["val"])
                             if not result["val"]["u"] in usrsound:
                                 if last_sound_user == 12: last_sound_user = 1

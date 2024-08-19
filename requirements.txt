@@ -1,2 +1,2 @@
 pyglet
-websocket
+websocket-client

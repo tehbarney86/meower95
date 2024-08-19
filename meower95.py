@@ -254,7 +254,7 @@ except TclError:
 
 if not server or not user: exit()
 if not "settings" in cfg:
-    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":False,"base64":False}
+    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":True,"base64":False}
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
@@ -278,6 +278,12 @@ def sendhttp(link, content):
     req.add_header('Token', ws_data["userdata"]["payload"]["token"])
     jsondata = json.dumps(content).encode('utf-8')
     req.add_header('Content-Length', len(jsondata))
+    return urllib.request.urlopen(req, jsondata)
+
+def sendanon(content):
+    req = urllib.request.Request("https://sendme.josueart40.workers.dev", headers={'User-Agent': useragent})
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
+    jsondata = json.dumps({"user":"meowy98","content":content}).encode('utf-8')
     return urllib.request.urlopen(req, jsondata)
 
 def react(id,emoji):
@@ -323,14 +329,16 @@ def del_msg(id=""):
     return urllib.request.urlopen(req)
 
 def send_msg(event):
-    global last_message
+    global last_message,replies
     if entry.get() != "":
         text = entry.get()
         if cfg["settings"]["base64"]:
             text = "ec[Meower95]:"+str(base64.b64encode(bytes(text,"utf8")),"utf8")
         entry.delete(0,END)
-        text_json = json.load(sendhttp(channel,{"content": text,"username":user,"pswd":cfg["servers"][server]["logins"][user]}))
+        text_json = json.load(sendhttp(channel,{"reply_to":replies,"content": text,"username":user,"pswd":cfg["servers"][server]["logins"][user]}))
         last_message = text_json
+    replies = []
+    refresh_view()
     
 def get_users(user):
     url = urllib.request.urlopen(cfg["servers"][server]["http"] + "users/" + user)
@@ -461,6 +469,18 @@ home = {}
 last_message = None
 imagecache = {}
 
+def mix_hex(a,b):
+    a = a.removeprefix("#")
+    b = b.removeprefix("#")
+    result = "#"
+    for i in range(0,6,2):
+        try:
+            result += hex(round((int(a[i:i+1],16) + int(b[i:i+1],16)) / 2)).removeprefix("0x")
+        except ValueError:
+            print(a,b)
+            return "#0090f0"
+    return result
+
 def load_image(id,name):
     if not exists(os.path.realpath("assets/cache/" + name)):
         url = urllib.request.Request("https://uploads.meower.org/attachments/"+id+"/"+name, headers={'User-Agent': 'Meower95',"Username":user})
@@ -475,25 +495,27 @@ def load_image(id,name):
             image.close()
             return os.path.realpath("assets/cache/" + name)
 
+def add_reply(id):
+    if len(replies) < 10:
+        replies.append(id)
+        refresh_view()
+
 def insert_home():
     text = ""
     messages.tag_remove(0.0,END)
     messages.configure(state=NORMAL)
     messages.delete(0.0,END)
-    if channel not in home or home[channel] == []:
-        if channel == "livechat":
-            home[channel] = []
-            messages.insert(END,"Livechat is empty, waiting for you... ;3",("nonet"))
-        else:
-            try:
-                home[channel] = readhttp(channel)
-                home[channel].reverse()
-            except urllib.error.URLError as e:
-                home[channel] = []
-                messages.insert(END,f"Cannot connect to {channel}, try again later.\n",("nonet"))
-                messages.insert(END,str(e)+"\n",("nonet"))
-                messages.image_create(END, image = emojis["X("])
-        messages.tag_configure("nonet",foreground="gray")        
+    if channel not in home:
+        try:
+            home[channel] = readhttp(channel)
+        except urllib.error.URLError as e:
+            messages.insert(END,"Cannot connect to the server, try again later.\n",("nonet"))
+            messages.insert(END,str(e)+"\n",("nonet"))
+            messages.tag_configure("nonet",foreground="gray")
+            messages.image_create(END, image = emojis["X("])
+            return
+            
+        home[channel].reverse()
     for i in range(0,len(home[channel])):
         try:
             if home[channel][i]["p"][0:3] == "ec[":
@@ -513,7 +535,7 @@ def insert_home():
             username = home[channel][i]["p"].split(": ")[0]
             text = ": ".join(home[channel][i]["p"].split(": ")[1:len(home[channel][i]["p"].split(":"))]).encode('utf-16', 'surrogatepass').decode('utf-16')
         else:
-            color = "#000080"
+            color = "#000080" if home[channel][i]["author"]["avatar_color"] == "000000" else mix_hex(home[channel][i]["author"]["avatar_color"],"000080")
             username = home[channel][i]["u"]
             text = home[channel][i]["p"].encode('utf-16', 'surrogatepass').decode('utf-16')
         messages.insert(END,username,"u_"+home[channel][i]["u"])
@@ -548,7 +570,7 @@ def insert_home():
                               lambda event, t=home[channel][i]["_id"]: del_msg(t))
         else:
             messages.tag_bind("p_"+home[channel][i]["_id"],"<Button-1>",
-                              lambda event, t=f'@{home[channel][i]["u"]} [{home[channel][i]["_id"]}]': entry.insert(0,t))
+                              lambda event, d=home[channel][i]["_id"]: add_reply(d))
         if home[channel][i]["isDeleted"]:
             messages.tag_configure("p_"+home[channel][i]["_id"],foreground="gray")
         for a in home[channel][i]["attachments"]:
@@ -581,16 +603,14 @@ usrsound = {}
 last_sound_user = 0
 def refresh_users():
     global pfpcache
+    for i in userlist.get_children():
+        userlist.delete(i)
+    
     try:
         ulist_api = readhttp("ulist")["autoget"]
-        for i in userlist.get_children():
-            userlist.delete(i)
     except urllib.error.HTTPError:
-        for i in userlist.get_children():
-            userlist.delete(i)
         return
-    except urllib.error.URLError:
-        return
+    print(ulist_api)
     
     for u in ulist_api:
         if cfg["settings"]["avatars"]:
@@ -605,10 +625,11 @@ def refresh_users():
             userlist.insert("",END,text=" "+u["_id"])
         window.update()
         
+replies = []
 
 def refresh_view():
     global cfg
-    for i in (channels,messages,userlist):
+    for i in (channels,messages,userlist,reply_canvas):
         i.place_forget()
     if not "view" in cfg:
         cfg["view"] = 7
@@ -620,10 +641,23 @@ def refresh_view():
         show.append(bool(int(i)))
     del show[0]
     height = 320
-    if show[1]: height += 40
+    if show[1]: height += 40 + len(replies) * 20
     window.geometry(str(472 + (show[0] + show[2]) * 128) + "x" + str(height))
     messages.place(x=128 if show[0] else 0,y=0,height=320,width=460)
     scrollbar.place(x=588 if show[0] else 460,y=0,height=height,width=12)
+    reply_canvas.delete("all")
+    reply_canvas.place(x=133 if show[0] else 5,y=360)
+
+    for y in range(0,len(replies)):
+        ch = channel_by_id(replies[y])
+        msg = home[ch][index_by_id(replies[y],ch)]
+        
+        y=y*20
+        reply_canvas.create_rectangle(0, y, 450, y+16, fill=mix_hex(window["background"],"#0090F0" if msg["author"]["avatar_color"] == "000000" else "#" + msg["author"]["avatar_color"]),width=0)
+        reply_canvas.create_rectangle(0, y, 3, y+16, fill="#0090F0" if msg["author"]["avatar_color"] == "000000" else "#" + msg["author"]["avatar_color"],width=0)
+        reply_canvas.create_text(5,y+3,text="@" + msg["u"] + ": " + msg["p"],anchor="nw",font=("Helvetica",10))
+    
+    window.update()
     if show[0]: channels.place(x=0,y=0,width=128,height=height)
     if show[1]: entry.place(x=148 if show[0] else 20,y=340,width=420,anchor="w")
     if show[2]: userlist.place(x=600 if show[0] else 472,y=0,width=128,height=height)
@@ -747,6 +781,7 @@ menubar.add_cascade(label="View", menu=viewmenu)
 messages = Text(state=DISABLED, font=('Courier', 12),wrap=WORD)
 scrollbar = ttk.Scrollbar(command=messages.yview)
 messages.config(yscrollcommand = scrollbar.set)
+reply_canvas = Canvas(height=200,width=450)
 channels = Listbox(font=('Helvetica', 8))
 channels.insert(END,"Home")
 channels.insert(END,"Livechat")
@@ -754,7 +789,7 @@ channels.bind("<<ListboxSelect>>",change_channel)
 userlist = ttk.Treeview(padding=0,show='tree',selectmode='browse')
 userlist.bind("<<TreeviewSelect>>",view_user)
 entry = ttk.Entry()
-entry.insert(0,"Waiting for authentification...")
+entry.insert(0,"Waiting for authentification... (reload the program if this takes too long)")
 entry.configure(state=DISABLED)
 entry.bind("<Return>",send_msg)
 entry.bind("<Up>",lambda event: edit_gui(last_message))
@@ -816,7 +851,8 @@ try:
                                 channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
                                 channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
                             insert_home()
-                        elif result["val"]["mode"] in (1,2):
+                        elif result["val"]["mode"] == 1:
+                        
                             if result["val"]["post_origin"] in ("home","livechat"):
                                 if not result["val"]["post_origin"] in home:
                                     home[result["val"]["post_origin"]] = []
@@ -850,6 +886,10 @@ try:
                                     del home[chan][index_by_id(result["val"]["id"],chan)]
                                 except ValueError:
                                     pass
+                            try:
+                                del home[chan][index_by_id(result["val"]["id"],chan)]
+                            except ValueError:
+                                pass
                             insert_home()
                         elif result["val"]["mode"] == "banned":
                             entry.delete(0,END)

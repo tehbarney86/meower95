@@ -24,6 +24,7 @@ Meower95 is simple too - every action is just a few clicks away:
 * Click on a username or profile on the right sidebar to see their quote and see in what group chats you both are in.
 * Right clicking on your messages allows you to quickly delete them;
 * Pressing the up arrow will allow you to edit your last typed message.
+
 Since Meower95 is still in development, more simplistic features are coming in the future, like: (TODO)
 * Right clicking on a user profile or their message opens up a window to report them;
 ## Hacks

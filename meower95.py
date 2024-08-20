@@ -1,10 +1,10 @@
 import urllib.request, json, os, time, random, base64, pyglet
 from tkinter import *
+from PIL import ImageTk,Image
 from tkinter import ttk
 from os.path import exists
 import subprocess as sp
 from sys import executable
-
 def log(*args,sep=" ",safe=False):
     if not exists("meower95.log"):
         lf = open("meower95.log","w")
@@ -482,21 +482,24 @@ def mix_hex(a,b):
     return result
 
 def load_image(id,name):
-    if not exists(os.path.realpath("assets/cache/" + name)):
+    filename = os.path.realpath("assets/cache/" + id + "/" + name)
+    if not exists(filename):
+        if not exists("assets/cache/"):
+            os.mkdir("assets/cache/")
+        os.mkdir("assets/cache/" + id)
         url = urllib.request.Request("https://uploads.meower.org/attachments/"+id+"/"+name, headers={'User-Agent': 'Meower95',"Username":user})
-        url.add_header('Token', ws_data["userdata"]["payload"]["token"])
         try:
             img = urllib.request.urlopen(url)
         except urllib.error.HTTPError:
             return os.path.realpath("assets/warning.png")
         else:
-            image = open(os.path.realpath("assets/cache/" + name),"wb")
+            image = open(filename,"wb")
             image.write(img.read())
             image.close()
-            return os.path.realpath("assets/cache/" + name)
+            return filename
 
 def add_reply(id):
-    if len(replies) < 10:
+    if len(replies) < 10 and entry["state"] == NORMAL:
         replies.append(id)
         refresh_view()
 
@@ -505,7 +508,12 @@ def insert_home():
     messages.tag_remove(0.0,END)
     messages.configure(state=NORMAL)
     messages.delete(0.0,END)
-    if channel not in home:
+    if channel not in home or home[channel] == []:
+        if channel == "livechat":
+            home[channel] = []
+            messages.insert(END,"Livechat is waiting for you! ;3",("nonet"))
+            messages.tag_configure("nonet",foreground="gray")
+            return
         try:
             home[channel] = readhttp(channel)
         except urllib.error.URLError as e:
@@ -574,17 +582,23 @@ def insert_home():
         if home[channel][i]["isDeleted"]:
             messages.tag_configure("p_"+home[channel][i]["_id"],foreground="gray")
         for a in home[channel][i]["attachments"]:
-            if a["mime"] in ("image/png","image/pgm","image/ppm","image/gif") and a["size"] < 2500000:
-                filename = os.path.realpath("assets/cache/") + a["id"] + os.path.splitext(a["filename"])[1]
+            if a["mime"][0:5] == "image" and a["size"] < 2500000:
+                filename = os.path.realpath("assets/cache/" + a["id"] + "/" + a["filename"])
                 try:
-                    if not a["id"] in imagecache.keys():
-                        print(a["id"])
-                        imagecache[a["id"]] = PhotoImage(file=filename if exists(filename) else load_image(a["id"],a["filename"]))
-                        if imagecache[a["id"]].width() > 480:
-                            imagecache[a["id"]] = imagecache[a["id"]].subsample(int(a["width"]/480)+1)
-                    messages.insert(END,"\n")
-                    messages.image_create(END, name=a["id"], image=imagecache[a["id"]])
-                    messages.insert(END,"\n")
+                    print(a["id"],filename)
+                    try:
+                        if not a["id"] in imagecache.keys():
+                            imagecache[a["id"]] = Image.open(filename if exists(filename) else load_image(a["id"],a["filename"]))
+                            if imagecache[a["id"]].width > imagecache[a["id"]].height and imagecache[a["id"]].width > 240:
+                                imagecache[a["id"]] = imagecache[a["id"]].resize((240,int(240*imagecache[a["id"]].height/imagecache[a["id"]].width)),Image.LANCZOS)
+                            elif imagecache[a["id"]].height > 240:
+                                imagecache[a["id"]] = imagecache[a["id"]].resize((int(240*imagecache[a["id"]].width/imagecache[a["id"]].height),240),Image.LANCZOS)
+                            imagecache[a["id"]] = ImageTk.PhotoImage(imagecache[a["id"]])
+                        messages.insert(END,"\n")
+                        messages.image_create(END, name=a["id"], image=imagecache[a["id"]])
+                        messages.insert(END,"\n")
+                    except AttributeError:
+                        print("Embed AttributeError")
                 except KeyError:
                     pass
                 except TclError:
@@ -609,6 +623,11 @@ def refresh_users():
     try:
         ulist_api = readhttp("ulist")["autoget"]
     except urllib.error.HTTPError:
+        for u in ws_data["ulist"].split(";"):
+            if u in pfps:
+                userlist.insert("",END,text=" "+u,image=pfps[u])
+            else:
+                userlist.insert("",END,text=" "+u)
         return
     print(ulist_api)
     
@@ -829,9 +848,14 @@ try:
                             entry.insert(END,"You were kicked from this server :(")
                             entry.configure(state=DISABLED)
                         elif result["val"] == "E:018 | Account Banned":
-                            entry.configure(state=NORMAL)
+                            entry.confsigure(state=NORMAL)
                             entry.delete(0,END)
                             entry.insert(END,"You were banned from this server :(")
+                            entry.configure(state=DISABLED)
+                        elif result["val"] == "E:119 | IP Blocked":
+                            entry.configure(state=NORMAL)
+                            entry.delete(0,END)
+                            entry.insert(END,"You were IP-banned from this server :(")
                             entry.configure(state=DISABLED)
                 elif result["cmd"] == "direct":
                     if "mode" in result["val"]:
@@ -851,8 +875,7 @@ try:
                                 channels.insert(END, i["members"][0] if i["type"] else i["nickname"])
                                 channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
                             insert_home()
-                        elif result["val"]["mode"] == 1:
-                        
+                        elif result["val"]["mode"] in (1,2):
                             if result["val"]["post_origin"] in ("home","livechat"):
                                 if not result["val"]["post_origin"] in home:
                                     home[result["val"]["post_origin"]] = []
@@ -873,24 +896,23 @@ try:
                                 print(e)
                             insert_home()
                         elif result["val"]["mode"] == "update_post":
-                            chan = channel_by_id(result["val"]["payload"]["_id"])
-                            home[chan][index_by_id(result["val"]["payload"]["_id"],chan)] = result["val"]["payload"]
-                            home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
-                            insert_home()
-                        elif result["val"]["mode"] == "delete":
-                            chan = channel_by_id(result["val"]["id"])
-                            if cfg["settings"]["msgdel"]:
-                                home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
-                            else:
-                                try:
-                                    del home[chan][index_by_id(result["val"]["id"],chan)]
-                                except ValueError:
-                                    pass
                             try:
-                                del home[chan][index_by_id(result["val"]["id"],chan)]
+                                chan = channel_by_id(result["val"]["payload"]["_id"])
+                                home[chan][index_by_id(result["val"]["payload"]["_id"],chan)] = result["val"]["payload"]
+                                home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
+                                insert_home()
                             except ValueError:
                                 pass
-                            insert_home()
+                        elif result["val"]["mode"] == "delete":
+                            try:
+                                chan = channel_by_id(result["val"]["id"])
+                                if cfg["settings"]["msgdel"]:
+                                    home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
+                                else:
+                                    del home[chan][index_by_id(result["val"]["id"],chan)]
+                                insert_home()
+                            except ValueError:
+                                pass
                         elif result["val"]["mode"] == "banned":
                             entry.delete(0,END)
                             entry.configure(state=NORMAL)
@@ -902,7 +924,6 @@ try:
                     ws_data[result["cmd"]] = result["val"]
                     if result["cmd"] == "ulist":
                         refresh_users()
-               
         except FileNotFoundError:
             pass
         window.update()
@@ -912,4 +933,4 @@ except Exception as Error:
     raise Error
 sp.Popen.terminate(proc)
 status = sp.Popen.poll(proc)
-print("see ya")
+print("see ya! ;3")

@@ -10,6 +10,10 @@ def writefile():
         transfer.write(recv)
         transfer.close()
     except Exception as e:
+        if e == "socket is already closed.":
+            websocket = websocket.WebSocket()
+            irun(lambda: websocket.connect(cfg["servers"][cfg["lastsession"]["server"]]["websocket"]))
+            irun(lambda: websocket.send('{"cmd": "direct", "val": {"cmd": "authpswd", "val": {"username": "' + cfg["lastsession"]["user"] + '", "pswd": "' + cfg["servers"][cfg["lastsession"]["server"]]["logins"][cfg["lastsession"]["user"]] + '"}}}'))
         print(e)
 def irun(com):
     while True:

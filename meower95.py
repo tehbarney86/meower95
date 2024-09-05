@@ -253,8 +253,12 @@ except TclError:
     pass
 
 if not server or not user: exit()
+def_settings = {"emoji":True,"markdown":True,"avatars":True,"msgdel":True,"base64":False,"smartdel":False}
 if not "settings" in cfg:
-    cfg["settings"] = {"emoji":True,"markdown":True,"avatars":True,"msgdel":True,"base64":False}
+    cfg["settings"] = {}
+for i in def_settings:
+    if i not in cfg["settings"]:
+        cfg["settings"][i] = def_settings[i]
 cfg["lastsession"] = {}
 cfg["lastsession"]["server"] = server
 cfg["lastsession"]["user"] = user
@@ -267,7 +271,7 @@ window.title("Meower95")
 logo = PhotoImage(file=os.path.realpath('assets/meower16.png'))
 window.wm_iconphoto(False, logo)
 
-print("a")
+print("Backend open.")
 proc = sp.Popen([executable,'backend.py'])
 
 def sendhttp(link, content):
@@ -323,6 +327,8 @@ def edit_msg(id="",content=""):
     return urllib.request.urlopen(req, jsondata)
 
 def del_msg(id=""):
+    if cfg["settings"]["smartdel"]:
+        edit_msg(id,"Deleted.")
     req = urllib.request.Request(cfg["servers"][server]["http"] + "posts?id=" + id, headers={'User-Agent': useragent}, method='DELETE')
     req.add_header('Username', user)
     req.add_header('Token', ws_data["userdata"]["payload"]["token"])
@@ -389,13 +395,21 @@ def settings():
     msgdel = ttk.Checkbutton(hacks,text="Don't hide messages on deletion")
     msgdel.configure(command=lambda: setvar("msgdel",msgdel))
     msgdel.place(x=30,y=20)
+    smartdel = ttk.Checkbutton(hacks,text="Autoedit my messages before deletion to be unreadable")
+    smartdel.configure(command=lambda: setvar("msgdel",msgdel))
+    smartdel.place(x=30,y=50)
     base64 = ttk.Checkbutton(hacks,text="Base64 encryption")
     base64.configure(command=lambda: setvar("base64",base64))
-    base64.place(x=30,y=50)
+    base64.place(x=30,y=80)
+    
     
     for i in cfg["settings"].keys():
-        eval(i).state(['!alternate'])
-        if cfg["settings"][i]: eval(i).state(['selected'])
+        try:
+            eval(i).state(['!alternate'])
+            if cfg["settings"][i]: eval(i).state(['selected'])
+        except AttributeError:
+            pass
+            
     
     while True:
         settings.update()
@@ -477,7 +491,7 @@ def mix_hex(a,b):
         try:
             result += hex(round((int(a[i:i+1],16) + int(b[i:i+1],16)) / 2)).removeprefix("0x")
         except ValueError:
-            print(a,b)
+            print("Error mixing colors",a,"and",b)
             return "#0090f0"
     return result
 
@@ -517,10 +531,13 @@ def insert_home():
         try:
             home[channel] = readhttp(channel)
         except urllib.error.URLError as e:
-            messages.insert(END,"Cannot connect to the server, try again later.\n",("nonet"))
+            messages.insert(END,"Cannot connect to the server:\n",("nonet"))
             messages.insert(END,str(e)+"\n",("nonet"))
+            messages.insert(END," ⚫ Check if you have a working network connection and Meower95 has access to it.\n",("nonet"))
+            messages.insert(END,f" ⚫ Check if the server you're trying to connect to ({server}) is up.\n",("nonet"))
+            messages.insert(END,f" ⚫ Have you possibly made a typo while entering the links for {server}?\n",("nonet"))
+            messages.insert(END,f" ⚫ You might have been IP blocked from {server}. You can still recieve postss realtime, but features are limited.",("nonet"))
             messages.tag_configure("nonet",foreground="gray")
-            messages.image_create(END, image = emojis["X("])
             return
             
         home[channel].reverse()
@@ -585,7 +602,6 @@ def insert_home():
             if a["mime"][0:5] == "image" and a["size"] < 2500000:
                 filename = os.path.realpath("assets/cache/" + a["id"] + "/" + a["filename"])
                 try:
-                    print(a["id"],filename)
                     try:
                         if not a["id"] in imagecache.keys():
                             imagecache[a["id"]] = Image.open(filename if exists(filename) else load_image(a["id"],a["filename"]))
@@ -699,12 +715,11 @@ channel = "home"
 channellist={}
 def change_channel(event):
     global channel
-    if not channels.selection_get() in ("Home","Livechat"):
+    if channels.selection_get() in ("Home","Livechat"):
+        channel = channels.selection_get().lower()
+    else:
         channel_id = channellist[channels.selection_get()]
         channel = "posts/" + channel_id
-    else:
-        channel = channels.selection_get().lower()
-    print(channel)
     insert_home()
     
 def index_by_id(id,chan):
@@ -839,8 +854,8 @@ try:
                 transfer = open("TRANSFER","w")
                 transfer.write("")
                 transfer.close()
-                print("new transfer data:",result)
                 if result ["cmd"] == "statuscode":
+                    print(result["val"])
                     if type(result["val"]) == str:
                         if result["val"] == "E:020 | Kicked":
                             entry.configure(state=NORMAL)
@@ -862,6 +877,7 @@ try:
                         if result["val"]["mode"] == "auth":
                             ws_data["userdata"] = result["val"]
                             log("Auth data received.",safe=True)
+                            print("Recieved auth")
                             entry.configure(state=NORMAL)
                             entry.delete(0,END)
                             if ws_data["userdata"]["payload"]["account"]["ban"]["state"] == "perm_restriction" and ws_data["userdata"]["payload"]["account"]["ban"]["restrictions"] == 31:
@@ -876,6 +892,7 @@ try:
                                 channellist[i["members"][0] if i["type"] else i["nickname"]] = i["_id"]
                             insert_home()
                         elif result["val"]["mode"] in (1,2):
+                            print(result["val"])
                             if result["val"]["post_origin"] in ("home","livechat"):
                                 if not result["val"]["post_origin"] in home:
                                     home[result["val"]["post_origin"]] = []
@@ -894,12 +911,21 @@ try:
                                 player.play()
                             except Exception as e:
                                 print(e)
+                            chan = channel_by_id(result["val"]["_id"])
+                            print(home[chan][index_by_id(result["val"]["_id"],chan)])
                             insert_home()
                         elif result["val"]["mode"] == "update_post":
                             try:
                                 chan = channel_by_id(result["val"]["payload"]["_id"])
+                                try:
+                                    prev_history = home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["history"]
+                                except KeyError:
+                                    prev_history = []
+                                prev_history.append(home[chan][index_by_id(result["val"]["payload"]["_id"],chan)])
                                 home[chan][index_by_id(result["val"]["payload"]["_id"],chan)] = result["val"]["payload"]
                                 home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["edited"] = True
+                                home[chan][index_by_id(result["val"]["payload"]["_id"],chan)]["history"] = prev_history
+                                print(home[chan][index_by_id(result["val"]["payload"]["_id"],chan)])
                                 insert_home()
                             except ValueError:
                                 pass
@@ -908,21 +934,27 @@ try:
                                 chan = channel_by_id(result["val"]["id"])
                                 if cfg["settings"]["msgdel"]:
                                     home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
+                                    if not "history" in home[chan][index_by_id(result["val"]["_id"],chan)]:
+                                        home[chan][index_by_id(result["val"]["_id"],chan)]["history"] = []
+                                    home[chan][index_by_id(result["val"]["_id"],chan)]["history"].append(home[chan][index_by_id(result["val"]["payload"]["_id"],chan)])
+                                    home[chan][index_by_id(result["val"]["id"],chan)]["isDeleted"] = True
                                 else:
                                     del home[chan][index_by_id(result["val"]["id"],chan)]
                                 insert_home()
                             except ValueError:
                                 pass
+                            print(home[chan][index_by_id(result["val"]["payload"]["_id"],chan)])
                         elif result["val"]["mode"] == "banned":
                             entry.delete(0,END)
                             entry.configure(state=NORMAL)
                             if result["val"]["payload"]["state"] == "temp_ban" and result["val"]["payload"]["expires"] > time.time() or result["val"]["payload"]["state"] == "perm_ban":
                                 entry.insert(END,f'You\'re banned for {result["val"]["payload"]["reason"]} :(')
                                 entry.configure(state=DISABLED)
-                        log('Unrecognized direct websocket data.',safe=True)
+                            print(f'You\'re banned for {result["val"]["payload"]["reason"]} :(')
                 else:
                     ws_data[result["cmd"]] = result["val"]
                     if result["cmd"] == "ulist":
+                        print("; ".join(result["val"].split(";")))
                         refresh_users()
         except FileNotFoundError:
             pass

@@ -4,6 +4,10 @@ i have been banned from meower for very silly (and kinda fake) reasons, so, sinc
 feel free to annoy everybody in chat once again, because `ec[Meower95!]aSBmZWx0IGxpa2UgaXQgbG9sIGZ1Y2sgdGhlIHJmYyBM`
 
 # Meower95!
+![License Badge](https://img.shields.io/github/license/tehbarney86/meower95)
+![Repo Size Badge](https://img.shields.io/github/repo-size/tehbarney86/meower95)
+![Sigma Badge](https://raw.githubusercontent.com/tehbarney86/meower95/d61d881017637b2b7b5fe56e4188e8ff0e45d3bb/assets/screenshots/license_%20MIT.svg)
+
 Meower95 is the new lightweight, cute, Windows 95-styled and heckin'-hackin' Meower client designed for low-end hardware, with features like:
 * Selecting your own server and account on start up;
 * Simple IRC-like layout and design;

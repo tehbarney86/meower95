@@ -4,6 +4,9 @@ i have been banned from meower for very silly (and kinda fake) reasons, so, sinc
 feel free to annoy everybody in chat once again, because `ec[Meower95!]aSBmZWx0IGxpa2UgaXQgbG9sIGZ1Y2sgdGhlIHJmYyBM`
 
 # Meower95!
+
+<p align="center"><i>"the spy has already breached our defences"</i></p>
+
 ![License Badge](https://img.shields.io/github/license/tehbarney86/meower95)
 ![Repo Size Badge](https://img.shields.io/github/repo-size/tehbarney86/meower95)
 ![Sigma Badge](https://raw.githubusercontent.com/tehbarney86/meower95/d61d881017637b2b7b5fe56e4188e8ff0e45d3bb/assets/screenshots/license_%20MIT.svg)
